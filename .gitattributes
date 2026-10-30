@@ -1,0 +1,11 @@
+# Repo is built on macOS/Windows/Linux: keep text files LF everywhere so
+# scripts, Rust and JSON stay byte-identical on every checkout.
+* text=auto eol=lf
+
+# Binary assets must never be normalized.
+*.png binary
+*.jpg binary
+*.icns binary
+*.ico binary
+*.dmg binary
+*.msi binary

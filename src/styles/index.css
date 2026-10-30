@@ -1,0 +1,300 @@
+@import "tailwindcss";
+
+:root {
+  --gk-canvas: #eef0f3;
+  --gk-sidebar: rgba(247, 247, 249, 0.9);
+  --gk-panel: #ffffff;
+  --gk-raised: #ffffff;
+  --gk-line: #e4e5ea;
+  --gk-line-strong: #d2d4da;
+  --gk-ink: #1c1c1e;
+  --gk-ink-soft: #5f6169;
+  --gk-ink-faint: #8f9199;
+  --gk-accent: #2f6feb;
+  --gk-accent-soft: rgba(47, 111, 235, 0.09);
+  --gk-positive: #1f9d55;
+  --gk-negative: #d93a32;
+  --gk-warning: #ac6a00;
+  --gk-diff-add: rgba(46, 160, 67, 0.13);
+  --gk-diff-add-strong: rgba(46, 160, 67, 0.24);
+  --gk-diff-del: rgba(215, 58, 73, 0.1);
+  --gk-diff-del-strong: rgba(215, 58, 73, 0.22);
+  --gk-diff-hunk: rgba(47, 111, 235, 0.07);
+  --gk-gutter: #f6f7f9;
+  --gk-shadow: 0 1px 2px rgba(16, 24, 40, 0.06), 0 12px 32px rgba(16, 24, 40, 0.08);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --gk-canvas: #151517;
+    --gk-sidebar: rgba(28, 28, 31, 0.92);
+    --gk-panel: #1c1c1f;
+    --gk-raised: #242428;
+    --gk-line: #2f2f34;
+    --gk-line-strong: #3e3e45;
+    --gk-ink: #f2f2f4;
+    --gk-ink-soft: #a5a7af;
+    --gk-ink-faint: #7b7d86;
+    --gk-accent: #5a94ff;
+    --gk-accent-soft: rgba(90, 148, 255, 0.16);
+    --gk-positive: #45c96b;
+    --gk-negative: #ff6f66;
+    --gk-warning: #e0a75a;
+    --gk-diff-add: rgba(63, 185, 80, 0.15);
+    --gk-diff-add-strong: rgba(63, 185, 80, 0.28);
+    --gk-diff-del: rgba(248, 81, 73, 0.13);
+    --gk-diff-del-strong: rgba(248, 81, 73, 0.26);
+    --gk-diff-hunk: rgba(90, 148, 255, 0.1);
+    --gk-gutter: #202024;
+    --gk-shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 16px 40px rgba(0, 0, 0, 0.35);
+  }
+}
+
+@theme inline {
+  --color-canvas: var(--gk-canvas);
+  --color-sidebar: var(--gk-sidebar);
+  --color-panel: var(--gk-panel);
+  --color-raised: var(--gk-raised);
+  --color-line: var(--gk-line);
+  --color-line-strong: var(--gk-line-strong);
+  --color-ink: var(--gk-ink);
+  --color-ink-soft: var(--gk-ink-soft);
+  --color-ink-faint: var(--gk-ink-faint);
+  --color-accent: var(--gk-accent);
+  --color-accent-soft: var(--gk-accent-soft);
+  --color-positive: var(--gk-positive);
+  --color-negative: var(--gk-negative);
+  --color-warning: var(--gk-warning);
+  --color-gutter: var(--gk-gutter);
+
+  --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", "PingFang SC",
+    "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+  --font-mono: "SF Mono", ui-monospace, "JetBrains Mono", Menlo, Consolas, monospace;
+
+  --shadow-float: var(--gk-shadow);
+}
+
+@layer base {
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+
+  body {
+    margin: 0;
+    overflow: hidden;
+    background: var(--gk-canvas);
+    color: var(--gk-ink);
+    font-family: var(--font-sans);
+    font-size: 13px;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  * {
+    box-sizing: border-box;
+  }
+
+  button {
+    font: inherit;
+    color: inherit;
+  }
+
+  ::selection {
+    background: color-mix(in srgb, var(--gk-accent) 24%, transparent);
+  }
+
+  :focus-visible {
+    outline: 2px solid color-mix(in srgb, var(--gk-accent) 55%, transparent);
+    outline-offset: 1px;
+  }
+
+  input[type="number"]::-webkit-inner-spin-button,
+  input[type="number"]::-webkit-outer-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+  }
+
+  ::-webkit-scrollbar {
+    width: 11px;
+    height: 11px;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: color-mix(in srgb, var(--gk-ink-faint) 34%, transparent);
+    border: 3px solid transparent;
+    border-radius: 999px;
+    background-clip: content-box;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: color-mix(in srgb, var(--gk-ink-faint) 52%, transparent);
+    background-clip: content-box;
+  }
+
+  ::-webkit-scrollbar-track,
+  ::-webkit-scrollbar-corner {
+    background: transparent;
+  }
+}
+
+@layer components {
+  .avatar {
+    background: color-mix(in srgb, hsl(var(--avatar-hue) 70% 52%) 16%, transparent);
+    color: color-mix(in srgb, hsl(var(--avatar-hue) 62% 42%) 82%, var(--gk-ink));
+  }
+
+  .diff-grid {
+    display: grid;
+    grid-template-columns: 3.25rem 3.25rem minmax(max-content, 1fr);
+    width: max-content;
+    min-width: 100%;
+    font-family: var(--font-mono);
+    font-size: 12px;
+    line-height: 1.55;
+  }
+
+  .split-grid {
+    display: grid;
+    grid-template-columns: 3.25rem minmax(0, 1fr) 3.25rem minmax(0, 1fr);
+    width: 100%;
+    font-family: var(--font-mono);
+    font-size: 12px;
+    line-height: 1.55;
+  }
+
+  .diff-cell {
+    min-height: 1.5rem;
+    white-space: pre;
+  }
+
+  /* Side-by-side cells wrap instead of scrolling: each side owns half the
+     pane, so long lines stay comparable without a giant horizontal sweep. */
+  .split-cell {
+    min-height: 1.5rem;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+  }
+
+  .diff-hunk {
+    padding: 2px 0.75rem;
+    background: var(--gk-diff-hunk);
+    color: var(--gk-accent);
+    font-size: 11px;
+    white-space: pre;
+  }
+
+  .diff-cell--add {
+    background: var(--gk-diff-add);
+  }
+
+  .diff-cell--del {
+    background: var(--gk-diff-del);
+  }
+
+  .split-cell--empty {
+    background-image: repeating-linear-gradient(
+      -45deg,
+      transparent 0 6px,
+      color-mix(in srgb, var(--gk-ink-faint) 8%, transparent) 6px 12px
+    );
+  }
+
+  /* In-diff search hits (see components/diff/DiffText.tsx). */
+  mark.diff-hit {
+    background: color-mix(in srgb, var(--gk-warning) 26%, transparent);
+    color: inherit;
+    border-radius: 2px;
+    padding: 0;
+  }
+
+  mark.diff-hit[data-active="true"] {
+    background: color-mix(in srgb, var(--gk-warning) 58%, transparent);
+    box-shadow: 0 0 0 1px color-mix(in srgb, var(--gk-warning) 55%, transparent);
+  }
+
+  .line-number {
+    color: var(--gk-ink-faint);
+    text-align: right;
+    padding-right: 0.6rem;
+    user-select: none;
+    font-variant-numeric: tabular-nums;
+    opacity: 0.75;
+  }
+}
+
+@layer utilities {
+  .drag-region {
+    -webkit-app-region: drag;
+  }
+
+  .no-drag {
+    -webkit-app-region: no-drag;
+  }
+
+  .animate-in {
+    animation: gk-in 180ms ease-out both;
+  }
+
+  @keyframes gk-in {
+    from {
+      opacity: 0;
+      transform: translateY(4px);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+
+  .animate-tip {
+    animation: gk-tip 120ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+
+  @keyframes gk-tip {
+    from {
+      opacity: 0;
+      transform: translateY(2px) scale(0.97);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+
+  .animate-pop {
+    animation: gk-pop 130ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+
+  @keyframes gk-pop {
+    from {
+      opacity: 0;
+      transform: translateY(-4px) scale(0.98);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+
+  .animate-fade {
+    animation: gk-fade 140ms ease-out both;
+  }
+
+  @keyframes gk-fade {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+}
+
+@media (prefers-color-scheme: dark) {
+  .avatar {
+    background: color-mix(in srgb, hsl(var(--avatar-hue) 66% 62%) 22%, transparent);
+    color: color-mix(in srgb, hsl(var(--avatar-hue) 72% 76%) 85%, var(--gk-ink));
+  }
+}

@@ -1,0 +1,239 @@
+name: release
+
+# 两种触发方式：
+#   1. push vX.Y.Z tag        → 构建 macOS + Windows 安装包并创建/更新同名 GitHub Release
+#   2. 手动 Run workflow      → 填 release_tag（如 v0.0.2）可把产物补挂到已有 Release；
+#                                留空则只上传 artifact，不碰 Release
+#
+# 版本号以 tag 为准：构建前把 tag 号写入 5 个版本文件（不提交），保证
+# Release、dmg、msi 与应用内版本一致。
+#
+# 可选 Secrets（macOS 签名 + 公证）：
+#   APPLE_SIGNING_IDENTITY / APPLE_ID / APPLE_PASSWORD / APPLE_TEAM_ID
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: "把产物挂到这个已有 Release（例如 v0.0.2）；留空只上传 artifact"
+        required: false
+        default: ""
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  version:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.resolve.outputs.version }}
+      tag: ${{ steps.resolve.outputs.tag }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - id: resolve
+        env:
+          TAG_INPUT: ${{ inputs.release_tag }}
+        run: |
+          tag="${TAG_INPUT:-}"
+          case "${GITHUB_REF_NAME}" in
+            v*) tag="${GITHUB_REF_NAME}" ;;
+          esac
+          if [ -n "$tag" ]; then
+            version="${tag#v}"
+          else
+            version="$(node -p "require('./package.json').version")"
+          fi
+          if ! printf '%s' "$version" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$'; then
+            echo "无法解析出 X.Y.Z 版本号：'$version'" >&2
+            exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "本次版本：$version；目标 Release：${tag:-（不发布）}"
+
+  macos:
+    needs: version
+    runs-on: macos-latest
+    timeout-minutes: 45
+    env:
+      VERSION: ${{ needs.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-darwin,x86_64-apple-darwin
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - name: Install dependencies
+        run: npm ci --no-audit --no-fund || (echo "::warning::npm ci 失败，回退到 npm install（lock 可能不同步）" && npm install --no-audit --no-fund)
+
+      - name: Diagnostics
+        run: |
+          node -v && npm -v && npx tauri --version
+          echo "--- 版本对齐预演"
+          node scripts/bump-version.mjs --set "$VERSION" --dry-run
+
+      - name: Align version with tag
+        run: node scripts/bump-version.mjs --set "$VERSION"
+
+      - name: Build .app + .dmg (universal)
+        env:
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          # 未配置的 secrets 会以空字符串注入，Tauri 会把它当成「用空身份签名」
+          # 并报 `no identity found`。先清掉空值；没有证书就退回 ad-hoc 签名，
+          # 这样产物在 Apple Silicon 上仍然能运行（只是没公证）。
+          for v in APPLE_ID APPLE_PASSWORD APPLE_TEAM_ID; do
+            if [ -z "${!v:-}" ]; then unset "$v"; fi
+          done
+          if [ -z "${APPLE_SIGNING_IDENTITY:-}" ]; then
+            unset APPLE_SIGNING_IDENTITY
+            export APPLE_SIGNING_IDENTITY="-"   # ad-hoc
+            echo "::warning::未配置 APPLE_SIGNING_IDENTITY，使用 ad-hoc 签名（未公证）"
+          fi
+
+          npx tauri build --bundles app,dmg --target universal-apple-darwin || {
+            echo "::warning::dmg 打包失败，退回 app 构建（稍后用 hdiutil 生成 dmg）"
+            npx tauri build --bundles app --target universal-apple-darwin
+          }
+
+      - name: Collect artifacts
+        run: |
+          set -eux
+          bundle="src-tauri/target/universal-apple-darwin/release/bundle"
+          # 注意：不能用 dist/ —— 那是 Vite 的前端构建目录
+          out="artifacts"
+          rm -rf "$out" && mkdir -p "$out"
+          ditto -c -k --keepParent "$bundle/macos/Git Kit.app" "$out/Git-Kit-$VERSION-universal.zip"
+
+          if ls "$bundle"/dmg/*.dmg >/dev/null 2>&1; then
+            cp "$bundle"/dmg/*.dmg "$out"/
+          else
+            echo "tauri 没有产出 dmg，改用 hdiutil 生成"
+            hdiutil create -volname "Git Kit" -srcfolder "$bundle/macos/Git Kit.app" \
+              -ov -format UDZO "$out/Git-Kit-$VERSION-universal.dmg"
+          fi
+
+          ( cd "$out" && shasum -a 256 ./*.zip ./*.dmg > SHA256SUMS-macos.txt && ls -lh )
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: macos
+          path: artifacts/*
+          if-no-files-found: error
+
+  windows:
+    needs: version
+    runs-on: windows-latest
+    timeout-minutes: 45
+    env:
+      VERSION: ${{ needs.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - name: Install dependencies
+        shell: pwsh
+        run: |
+          if (-not (npm ci --no-audit --no-fund)) {
+            Write-Host "::warning::npm ci 失败，回退到 npm install"
+            npm install --no-audit --no-fund
+          }
+
+      - name: Diagnostics
+        shell: pwsh
+        run: |
+          node -v; npm -v; npx tauri --version
+          node scripts/bump-version.mjs --set "$env:VERSION" --dry-run
+
+      - name: Align version with tag
+        run: node scripts/bump-version.mjs --set "$env:VERSION"
+
+      - name: Build .msi
+        shell: pwsh
+        run: |
+          npx tauri build --bundles msi
+          if ($LASTEXITCODE -ne 0) {
+            Write-Host "::warning::msi 打包失败，退回 nsis（.exe）"
+            npx tauri build --bundles nsis
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          }
+
+      - name: Collect artifacts
+        shell: pwsh
+        run: |
+          # 注意：不能用 dist/ —— 那是 Vite 的前端构建目录
+          $out = "artifacts"
+          Remove-Item -Recurse -Force $out -ErrorAction SilentlyContinue
+          New-Item -ItemType Directory -Force -Path $out | Out-Null
+          $files = @()
+          $files += Get-ChildItem "src-tauri/target/release/bundle/msi/*.msi" -ErrorAction SilentlyContinue
+          $files += Get-ChildItem "src-tauri/target/release/bundle/nsis/*.exe" -ErrorAction SilentlyContinue
+          if ($files.Count -eq 0) { throw "既没有 msi 也没有 nsis 产物" }
+          $files | ForEach-Object { Copy-Item $_.FullName $out }
+          Get-ChildItem $out -File |
+            ForEach-Object { "$((Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLower())  $($_.Name)" } |
+            Set-Content -Path "$out/SHA256SUMS-windows.txt" -Encoding ASCII
+          Get-ChildItem $out -File | ForEach-Object { Write-Host "$($_.Name)  $([math]::Round($_.Length / 1MB, 2)) MB" }
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows
+          path: artifacts/*
+          if-no-files-found: error
+
+  publish:
+    needs: [version, macos, windows]
+    if: needs.version.outputs.tag != ''
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+
+      - name: List release files
+        run: ls -lh artifacts
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ needs.version.outputs.tag }}
+          name: Git Kit v${{ needs.version.outputs.version }}
+          fail_on_unmatched_files: false
+          files: |
+            artifacts/*.dmg
+            artifacts/*.msi
+            artifacts/*.exe
+            artifacts/*.zip
+            artifacts/SHA256SUMS-*.txt

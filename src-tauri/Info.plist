@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <!-- Only paths the user explicitly picks in the folder dialog are read.
+       These strings make the one-off macOS consent prompt self-explanatory. -->
+  <key>NSDesktopFolderUsageDescription</key>
+  <string>Git Kit 读取你选择的项目仓库，用于展示分支、提交与改动对比。</string>
+  <key>NSDocumentsFolderUsageDescription</key>
+  <string>Git Kit 读取你选择的项目仓库，用于展示分支、提交与改动对比。</string>
+  <key>NSDownloadsFolderUsageDescription</key>
+  <string>Git Kit 读取你选择的项目仓库，用于展示分支、提交与改动对比。</string>
+  <key>NSRemovableVolumesUsageDescription</key>
+  <string>Git Kit 读取位于外置磁盘上的项目仓库。</string>
+  <key>NSHumanReadableCopyright</key>
+  <string>© 2026 Aitify</string>
+</dict>
+</plist>
