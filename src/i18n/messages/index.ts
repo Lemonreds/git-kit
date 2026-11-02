@@ -11,6 +11,7 @@ import { en as libEn, zh as libZh } from "./lib";
 import { en as projectsEn, zh as projectsZh } from "./projects";
 import { en as settingsEn, zh as settingsZh } from "./settings";
 import { en as storeEn, zh as storeZh } from "./store";
+import { en as tagsEn, zh as tagsZh } from "./tags";
 import { en as terminalEn, zh as terminalZh } from "./terminal";
 
 export const zhCN = {
@@ -19,6 +20,7 @@ export const zhCN = {
   ...projectsZh,
   ...terminalZh,
   ...branchesZh,
+  ...tagsZh,
   ...changesZh,
   ...commitsZh,
   ...diffZh,
@@ -38,6 +40,7 @@ export const enUS: Record<keyof typeof zhCN, Message> = {
   ...projectsEn,
   ...terminalEn,
   ...branchesEn,
+  ...tagsEn,
   ...changesEn,
   ...commitsEn,
   ...diffEn,

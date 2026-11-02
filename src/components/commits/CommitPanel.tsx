@@ -1,4 +1,4 @@
-import { ChevronLeft, GitBranch, GitCommitHorizontal, Loader2 } from "lucide-react";
+import { ChevronLeft, GitBranch, GitCommitHorizontal, Loader2, Tag } from "lucide-react";
 
 import { useT } from "../../i18n";
 import { useAppStore } from "../../store/appStore";
@@ -19,6 +19,7 @@ export default function CommitPanel() {
   const {
     project,
     branch,
+    tag,
     commits,
     loading,
     hasMore,
@@ -26,6 +27,7 @@ export default function CommitPanel() {
   } = useSlice((state) => ({
     project: state.activeProject,
     branch: state.selectedBranch,
+    tag: state.selectedTag,
     commits: state.commits,
     loading: state.commitsLoading,
     hasMore: state.commitsHasMore,
@@ -52,13 +54,19 @@ export default function CommitPanel() {
           <span className="truncate text-ink-faint">{project?.name}</span>
           <span className="shrink-0 text-line-strong">/</span>
           <span className="flex min-w-0 items-center gap-1 font-mono text-[11.5px] font-medium text-ink">
-            <GitBranch size={11} className="shrink-0 text-ink-faint" />
-            <span className="truncate">{branch?.name ?? t("commits.history")}</span>
+            {tag ? (
+              <Tag size={11} className="shrink-0 text-ink-faint" />
+            ) : (
+              <GitBranch size={11} className="shrink-0 text-ink-faint" />
+            )}
+            <span className="truncate">{tag?.name ?? branch?.name ?? t("commits.history")}</span>
+            {tag ? (
+              <span className="shrink-0 rounded border border-line px-1 py-px font-sans text-[9px] font-medium text-ink-faint">
+                {t("tags.badge")}
+              </span>
+            ) : null}
           </span>
         </div>
-        <span className="shrink-0 text-[10.5px] text-ink-faint">
-          {t("commits.count", { count: commits.length, more: hasMore ? "+" : "" })}
-        </span>
         {branch ? (
           <div className="no-drag flex shrink-0 items-center gap-0.5 border-l border-line pl-1">
             <BranchRowActions
@@ -83,11 +91,11 @@ export default function CommitPanel() {
         ) : null}
       </header>
 
-      <div
-        className={`min-h-0 flex-1 px-2 py-2 ${virtualized ? "overflow-hidden" : "overflow-y-auto"}`}
-      >
+      <div className="min-h-0 flex-1 overflow-hidden">
         {loading && commits.length === 0 ? (
-          <SkeletonRows rows={8} />
+          <div className="px-2 py-2">
+            <SkeletonRows rows={8} />
+          </div>
         ) : commits.length === 0 ? (
           <EmptyState
             icon={GitCommitHorizontal}
@@ -102,10 +110,10 @@ export default function CommitPanel() {
             hasMore={hasMore}
             selectCommit={(sha) => void selectCommit(sha)}
             loadMore={() => void loadMore()}
-            listKey={branch?.refName ?? ""}
+            listKey={branch?.refName ?? (tag ? `refs/tags/${tag.name}` : "")}
           />
         ) : (
-          <div className="space-y-px">
+          <div className="h-full space-y-px overflow-y-auto px-2 py-2">
             {commits.map((commit) => (
               <CommitRow
                 key={commit.sha}

@@ -4,7 +4,7 @@ import { t } from "../../i18n";
 import { api, IpcError } from "../../lib/ipc";
 import type { ReflogEntry, RepoOperationState, StashEntry, TagInfo } from "../../lib/types";
 import type { AppState } from "../appStore";
-import { errorMessage, feedback, invalidateCaches } from "../shared";
+import { clearDetail, errorMessage, feedback, invalidateCaches, TAG_PAGE } from "../shared";
 import type { OpOutcome } from "../types";
 
 export interface WorkflowSlice {
@@ -12,6 +12,23 @@ export interface WorkflowSlice {
   repoState: RepoOperationState | null;
   stashEntries: StashEntry[];
   tags: TagInfo[];
+  tagsLoading: boolean;
+  /** How many tags the list currently renders; "load more" grows it by TAG_PAGE. */
+  tagLimit: number;
+  /** Tag filter of the tags pane (name / message / sha / commit summary). */
+  tagFilter: string;
+  /**
+   * Target a pending create form should point at (a commit sha or branch name).
+   * Set by "tag this commit" style entry points, cleared when the form closes.
+   */
+  tagTarget: string | null;
+  /** Tag with an operation in flight (push / delete), rendered as a spinner. */
+  tagBusy: string | null;
+  /** True while `git push --tags` runs. */
+  tagPushingAll: boolean;
+  /** Last `git ls-remote --tags` result; `null` = never synced this project. */
+  tagRemote: TagRemoteState | null;
+  tagRemoteLoading: boolean;
   reflog: ReflogEntry[];
 
   refreshRepoState: () => Promise<void>;
@@ -24,12 +41,33 @@ export interface WorkflowSlice {
   ignorePath: (path: string, isDir: boolean) => Promise<boolean>;
   mergeBranch: (source: string, noFf: boolean) => Promise<OpOutcome>;
   revertCommit: (sha: string) => Promise<OpOutcome>;
+  /** Open the tags pane of the middle column; `newTagTarget` pre-fills the form. */
+  openTags: (newTagTarget?: string | null) => void;
+  clearTagTarget: () => void;
+  setTagFilter: (filter: string) => void;
+  /** Reveal the next TAG_PAGE tags at the bottom of the list. */
+  loadMoreTags: () => void;
+  /** Back to the first page (new keyword / remote filter / project). */
+  resetTagPage: () => void;
   refreshTags: () => Promise<void>;
   createTag: (name: string, target: string, message: string) => Promise<string | null>;
   deleteTag: (name: string, deleteRemote?: boolean) => Promise<void>;
   pushTag: (name: string) => Promise<boolean>;
+  pushAllTags: () => Promise<boolean>;
+  syncRemoteTags: () => Promise<void>;
   refreshReflog: () => Promise<void>;
   resetTo: (sha: string, hard: boolean) => Promise<boolean>;
+}
+
+/** Last remote tag read: `git ls-remote --tags` is the one tag read that nets. */
+export interface TagRemoteState {
+  /** Remote the list came from; `null` when the repository has no remote. */
+  remote: string | null;
+  /** Remote tag name -> peeled commit sha. */
+  tags: Record<string, string>;
+  /** Why the list is empty, when the read failed softly. */
+  failure: string | null;
+  syncedAt: number;
 }
 
 /**
@@ -43,6 +81,14 @@ export const createWorkflowSlice: StateCreator<AppState, [], [], WorkflowSlice> 
     repoState: null,
     stashEntries: [],
     tags: [],
+    tagsLoading: false,
+    tagLimit: TAG_PAGE,
+    tagFilter: "",
+    tagTarget: null,
+    tagBusy: null,
+    tagPushingAll: false,
+    tagRemote: null,
+    tagRemoteLoading: false,
     reflog: [],
 
     async refreshRepoState() {
@@ -229,12 +275,53 @@ export const createWorkflowSlice: StateCreator<AppState, [], [], WorkflowSlice> 
       }
     },
 
+    openTags(newTagTarget) {
+      // Leaving the commit / diff detail behind keeps the diff column from
+      // showing a file of a view the user just closed.
+      set({
+        ...clearDetail(),
+        pane: "tags",
+        tagFilter: "",
+        tagLimit: TAG_PAGE,
+        tagTarget: newTagTarget ?? null,
+      });
+    },
+
+    clearTagTarget() {
+      set({ tagTarget: null });
+    },
+
+    setTagFilter(filter) {
+      // A new keyword is a new result set: start it at the first page.
+      set({ tagFilter: filter, tagLimit: TAG_PAGE });
+    },
+
+    loadMoreTags() {
+      const { tagLimit, tags } = get();
+      if (tagLimit >= tags.length) return;
+      set({ tagLimit: tagLimit + TAG_PAGE });
+    },
+
+    resetTagPage() {
+      if (get().tagLimit === TAG_PAGE) return;
+      set({ tagLimit: TAG_PAGE });
+    },
+
     async refreshTags() {
       const project = get().activeProject;
       if (!project || project.status !== "ok") return;
+      set({ tagsLoading: true });
       try {
-        set({ tags: await api.listTags(project.path) });
+        const tags = await api.listTags(project.path);
+        // A refresh can shrink the list (tags deleted in a terminal): clamp the
+        // page instead of resetting it, so a user who loaded 60 rows keeps them.
+        set({
+          tags,
+          tagsLoading: false,
+          tagLimit: Math.min(get().tagLimit, Math.max(tags.length, TAG_PAGE)),
+        });
       } catch (error) {
+        set({ tagsLoading: false });
         fail(t("store.loadTagsFailed"), error);
       }
     },
@@ -244,6 +331,14 @@ export const createWorkflowSlice: StateCreator<AppState, [], [], WorkflowSlice> 
       if (!project) return t("store.noProject");
       try {
         const tags = await api.createTag(project.path, name, target, message);
+        // A brand new tag only exists locally: mark it as "not pushed" instead
+        // of forcing another `ls-remote` round trip.
+        const remote = get().tagRemote;
+        if (remote && remote.tags[name]) {
+          const remaining = { ...remote.tags };
+          delete remaining[name];
+          set({ tagRemote: { ...remote, tags: remaining } });
+        }
         set({ tags });
         notify("success", t("store.tagCreated", { name }));
         return null;
@@ -254,10 +349,18 @@ export const createWorkflowSlice: StateCreator<AppState, [], [], WorkflowSlice> 
 
     async deleteTag(name, deleteRemote = false) {
       const project = get().activeProject;
-      if (!project) return;
+      if (!project || get().tagBusy) return;
+      set({ tagBusy: name });
       try {
         const result = await api.deleteTag(project.path, name, deleteRemote);
-        set({ tags: result.tags });
+        const remote = get().tagRemote;
+        let tagRemote = remote;
+        if (remote && result.remoteDeleted && remote.tags[name]) {
+          const remaining = { ...remote.tags };
+          delete remaining[name];
+          tagRemote = { ...remote, tags: remaining };
+        }
+        set({ tags: result.tags, tagRemote, tagBusy: null });
         if (result.remoteFailure) {
           // The local tag is already gone — say so instead of a bare error toast.
           get().showAlert(
@@ -273,20 +376,84 @@ export const createWorkflowSlice: StateCreator<AppState, [], [], WorkflowSlice> 
             : t("store.tagDeleted", { name }),
         );
       } catch (error) {
+        set({ tagBusy: null });
         fail(t("store.deleteTagFailed"), error);
       }
     },
 
     async pushTag(name) {
       const project = get().activeProject;
-      if (!project) return false;
+      if (!project || get().tagBusy) return false;
+      set({ tagBusy: name });
       try {
         const remote = await api.pushTag(project.path, name);
+        const tagRemote = get().tagRemote;
+        const local = get().tags.find((tag) => tag.name === name);
+        set({
+          tagBusy: null,
+          tagRemote:
+            tagRemote && local
+              ? { ...tagRemote, tags: { ...tagRemote.tags, [name]: local.sha } }
+              : tagRemote,
+        });
         notify("success", t("store.tagPushed", { name, remote }));
         return true;
       } catch (error) {
+        set({ tagBusy: null });
         fail(t("store.pushTagFailed"), error);
         return false;
+      }
+    },
+
+    async pushAllTags() {
+      const project = get().activeProject;
+      if (!project || get().tagPushingAll) return false;
+      set({ tagPushingAll: true });
+      try {
+        const result = await api.pushAllTags(project.path);
+        // Everything local now exists on the remote, so the tags of the last
+        // sync plus every local tag is an accurate remote view — no need to ask
+        // the user to press "sync" right after pushing.
+        const tagRemote = get().tagRemote;
+        const pushed: Record<string, string> = { ...(tagRemote?.tags ?? {}) };
+        for (const tag of get().tags) pushed[tag.name] = tag.sha;
+        set({
+          tagPushingAll: false,
+          tagRemote: {
+            remote: result.remote,
+            tags: pushed,
+            failure: null,
+            syncedAt: Date.now(),
+          },
+        });
+        notify(
+          "success",
+          t("store.tagsPushedAll", { count: result.pushed, remote: result.remote }),
+        );
+        return true;
+      } catch (error) {
+        set({ tagPushingAll: false });
+        fail(t("store.pushTagsAllFailed"), error);
+        return false;
+      }
+    },
+
+    async syncRemoteTags() {
+      const project = get().activeProject;
+      if (!project || project.status !== "ok" || get().tagRemoteLoading) return;
+      set({ tagRemoteLoading: true });
+      try {
+        const page = await api.listRemoteTags(project.path);
+        const tags: Record<string, string> = {};
+        for (const tag of page.tags) tags[tag.name] = tag.sha;
+        set({
+          tagRemoteLoading: false,
+          tagRemote: { remote: page.remote, tags, failure: page.failure, syncedAt: Date.now() },
+        });
+        if (page.failure) notify("error", t("store.tagRemoteReadFailed"));
+      } catch (error) {
+        set({ tagRemoteLoading: false });
+        fail(t("store.tagRemoteReadFailed"), error);
       }
     },
 

@@ -1,6 +1,6 @@
 import type { DeleteFailure, RebaseResult } from "../lib/types";
 
-export type PaneMode = "branches" | "commits" | "changes";
+export type PaneMode = "branches" | "commits" | "changes" | "tags";
 export type DiffMode = "unified" | "split";
 export type ToastKind = "info" | "success" | "error";
 

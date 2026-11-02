@@ -561,9 +561,46 @@ pub struct TagInfo {
     pub short_sha: String,
     pub annotated: bool,
     pub message: Option<String>,
+    /// Tagger time for annotated tags, commit time for lightweight ones.
     pub created_at: Option<i64>,
     /// A commit-like name for display (`HEAD`, `origin/main`, …).
     pub target: Option<String>,
+    /// Summary of the commit the tag peels to — what the tag row shows.
+    pub commit_summary: Option<String>,
+    /// Committer time of the peeled commit (seconds since epoch).
+    pub commit_time: Option<i64>,
+}
+
+/// One tag as it exists on the remote, as reported by `git ls-remote --tags`.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RemoteTag {
+    pub name: String,
+    /// Peeled commit id (annotated tags report the tag object otherwise).
+    pub sha: String,
+}
+
+/// The tag list of one remote plus the reason it could not be read.
+///
+/// A failing network read is *not* an error: the local tag list stays usable,
+/// so the UI decides whether to show the remote column at all.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RemoteTagPage {
+    /// Remote the list was read from (`origin`, `upstream`, …).
+    pub remote: Option<String>,
+    pub tags: Vec<RemoteTag>,
+    /// Human readable reason the list is empty, when reading it failed softly.
+    pub failure: Option<String>,
+}
+
+/// Outcome of `git push <remote> --tags`.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PushAllTagsResult {
+    pub remote: String,
+    /// Local tags in the repository when the push ran (git skips up-to-date ones).
+    pub pushed: usize,
 }
 
 #[derive(Debug, Clone, Serialize)]

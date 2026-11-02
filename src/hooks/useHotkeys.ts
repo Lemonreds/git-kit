@@ -44,6 +44,13 @@ export function useHotkeys(): void {
         return;
       }
 
+      // ⌘⇧T: tags pane. Also above the guard so it works from the search box.
+      if (withMeta && event.shiftKey && event.key.toLowerCase() === "t") {
+        event.preventDefault();
+        store.openTags();
+        return;
+      }
+
       if (isTypingTarget(event.target)) return;
 
       if (event.key === "Escape") {

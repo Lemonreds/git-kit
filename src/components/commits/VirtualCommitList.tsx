@@ -97,7 +97,9 @@ export default function VirtualCommitList({
 
   return (
     <List
-      className="h-full"
+      // Padding on the scroller itself keeps the scrollbar flush with the pane
+      // edge, matching the plain commit list.
+      className="h-full px-2 py-2"
       style={{ height: "100%" }}
       defaultHeight={520}
       rowCount={commits.length + (hasMore ? 1 : 0)}

@@ -15,7 +15,6 @@ const PushDialog = lazy(() => import("./PushDialog"));
 const RebaseDialog = lazy(() => import("./RebaseDialog"));
 const ReflogDialog = lazy(() => import("./ReflogDialog"));
 const SquashDialog = lazy(() => import("./SquashDialog"));
-const TagDialog = lazy(() => import("./TagDialog"));
 
 /** Row-level operation in flight, rendered as a spinner + label on the row. */
 export interface BranchBusy {
@@ -64,6 +63,7 @@ export function useBranchActions(): BranchActionState {
   const deleteLocalBranches = useAppStore((state) => state.deleteLocalBranches);
   const notify = useAppStore((state) => state.notify);
   const showAlert = useAppStore((state) => state.showAlert);
+  const openTags = useAppStore((state) => state.openTags);
 
   const [busy, setBusy] = useState<BranchBusy | null>(null);
   const [squashTarget, setSquashTarget] = useState<BranchSummary | null>(null);
@@ -75,7 +75,6 @@ export function useBranchActions(): BranchActionState {
   const [pendingSwitch, setPendingSwitch] = useState<BranchSummary | null>(null);
   const [compareTarget, setCompareTarget] = useState<BranchSummary | null>(null);
   const [mergeOpen, setMergeOpen] = useState(false);
-  const [tagsOpen, setTagsOpen] = useState(false);
   const [reflogOpen, setReflogOpen] = useState(false);
   const [pendingDelete, setPendingDelete] = useState<BranchSummary | null>(null);
   const [pendingForceDelete, setPendingForceDelete] = useState<BranchSummary | null>(null);
@@ -144,7 +143,9 @@ export function useBranchActions(): BranchActionState {
       else notify("error", t("branches.noCurrentBranch"));
     },
     compare: setCompareTarget,
-    tags: () => setTagsOpen(true),
+    // Tags live in their own pane now: the row action navigates there instead
+    // of opening the old (search-less) tag dialog.
+    tags: openTags,
     reflog: () => setReflogOpen(true),
   };
 
@@ -181,7 +182,6 @@ export function useBranchActions(): BranchActionState {
         {compareTarget ? (
           <CompareDialog branch={compareTarget} onClose={() => setCompareTarget(null)} />
         ) : null}
-        {tagsOpen ? <TagDialog onClose={() => setTagsOpen(false)} /> : null}
         {reflogOpen ? <ReflogDialog onClose={() => setReflogOpen(false)} /> : null}
       </Suspense>
 

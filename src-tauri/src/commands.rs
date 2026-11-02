@@ -9,10 +9,9 @@ use crate::model::{
     AppSettings, BranchSummary, BranchTemplate, CheckoutResult, CherryPickResult, CommitDetail,
     CommitFiles, CommitPage, CommitResult, ComparePreview, CreateBranchResult,
     DeleteBranchesResult, DeleteTagResult, FetchAllResult, FileDiff, HeadCommitPreview,
-    MergePreview, MergeResult,
-    ProjectList,
-    ProjectStatus, ProjectView, PullPreview, PullResult, PushPreview, PushResult, RebasePreview,
-    RebaseResult, ReflogEntry, RemoteBranchPage, RemoteInfo, RemoveRemoteResult, RepoIdentity,
+    MergePreview, MergeResult, ProjectList, ProjectStatus, ProjectView, PullPreview, PullResult,
+    PushAllTagsResult, PushPreview, PushResult, RebasePreview, RebaseResult, ReflogEntry,
+    RemoteBranchPage, RemoteInfo, RemoteTagPage, RemoveRemoteResult, RepoIdentity,
     RepoOperationState, RepoSnapshot, ResetResult, SquashPreview, SquashResult, StashList,
     SyncResult, TagInfo, WorktreeStatus,
 };
@@ -695,6 +694,16 @@ pub fn delete_tag(
 #[tauri::command(async)]
 pub fn push_tag(repo_path: String, name: String) -> Result<String, AppError> {
     workflow::push_tag(std::path::Path::new(&repo_path), &name)
+}
+
+#[tauri::command(async)]
+pub fn list_remote_tags(repo_path: String) -> Result<RemoteTagPage, AppError> {
+    workflow::list_remote_tags(std::path::Path::new(&repo_path))
+}
+
+#[tauri::command(async)]
+pub fn push_all_tags(repo_path: String) -> Result<PushAllTagsResult, AppError> {
+    workflow::push_all_tags(std::path::Path::new(&repo_path))
 }
 
 #[tauri::command(async)]

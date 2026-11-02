@@ -231,11 +231,7 @@ export default function BranchPanel() {
         className="drag-region flex h-11 shrink-0 items-center gap-2 border-b border-line px-2.5"
       >
         <PaneTabs active="branches" changesCount={changes?.entries.length ?? 0} />
-        <div className="no-drag ml-auto flex items-center gap-0.5">
-          <span className="shrink-0 pr-1 text-[10.5px] text-ink-faint">
-            {t("branches.localCount", { count: localBranches.length })}
-            {remoteLoaded ? t("branches.remoteCountSuffix", { count: remoteBranches.length }) : ""}
-          </span>
+        <div className="no-drag ml-auto flex min-w-0 items-center gap-0.5">
           <IconButton
             label={t("branches.fetchAll")}
             onClick={() => void handleFetchAll()}
@@ -279,11 +275,14 @@ export default function BranchPanel() {
         </label>
       </div>
 
-      <div
-        className={`min-h-0 flex-1 px-2 pb-3 pt-1 ${virtualized ? "overflow-hidden" : "overflow-y-auto"}`}
-      >
+      {/* The scroller always carries the padding itself: a padded parent around
+          the virtual list would inset its scrollbar, making it look different
+          from the plain list. */}
+      <div className="min-h-0 flex-1 overflow-hidden">
         {loading ? (
-          <SkeletonRows rows={7} />
+          <div className="px-2 pb-3 pt-1">
+            <SkeletonRows rows={7} />
+          </div>
         ) : branches.length === 0 && remoteBranches.length === 0 ? (
           <EmptyState
             icon={GitBranch}
@@ -303,7 +302,7 @@ export default function BranchPanel() {
             listKey={listKey}
           />
         ) : (
-          <div className="space-y-px">
+          <div className="h-full space-y-px overflow-y-auto px-2 pb-3 pt-1">
             {localFiltered.map(renderRow)}
 
             {remoteLoaded && remoteTotal > 0 ? (

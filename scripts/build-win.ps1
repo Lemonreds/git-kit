@@ -17,7 +17,8 @@ Git Kit — Windows 安装包（.msi / .exe）
   · MSI 由 Tauri 自动下载 WiX Toolset，无需手动安装
   · WebView2 运行时按 tauri.conf.json 的 webviewInstallMode 处理（默认联网下载 bootstrapper）
 
-产物输出到 .\release\，附带 SHA256SUMS.txt。
+产物输出到 .\release\，附带 SHA256SUMS-v<版本>-windows.txt。
+（.msi / .exe 由 Tauri 生成，文件名本身已带版本号。）
 #>
 
 [CmdletBinding()]
@@ -119,7 +120,7 @@ $hashes = Get-ChildItem $ReleaseDir -File |
     $hash = (Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLower()
     "$hash  $($_.Name)"
   }
-$hashes | Set-Content -Path (Join-Path $ReleaseDir "SHA256SUMS.txt") -Encoding ASCII
+$hashes | Set-Content -Path (Join-Path $ReleaseDir "SHA256SUMS-v$AppVersion-windows.txt") -Encoding ASCII
 
 Write-Host ""
 Write-Ok "打包完成 -> $ReleaseDir"

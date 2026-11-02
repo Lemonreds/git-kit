@@ -28,11 +28,13 @@ import type {
   PullResult,
   PushPreview,
   PushResult,
+  PushAllTagsResult,
   RebasePreview,
   RebaseResult,
   ReflogEntry,
   RemoteBranchPage,
   RemoteInfo,
+  RemoteTagPage,
   RemoveRemoteResult,
   RepoIdentity,
   RepoOperationState,
@@ -213,6 +215,8 @@ export const api = {
     call<DeleteTagResult>("delete_tag", { repoPath, name, deleteRemote }),
   pushTag: (repoPath: string, name: string) =>
     call<string>("push_tag", { repoPath, name }),
+  listRemoteTags: (repoPath: string) => call<RemoteTagPage>("list_remote_tags", { repoPath }),
+  pushAllTags: (repoPath: string) => call<PushAllTagsResult>("push_all_tags", { repoPath }),
 
   reflogEntries: (repoPath: string, limit = 20) =>
     call<ReflogEntry[]>("reflog_entries", { repoPath, limit }),

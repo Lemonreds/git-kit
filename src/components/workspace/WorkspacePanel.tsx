@@ -7,6 +7,7 @@ import BranchPanel from "../branches/BranchPanel";
 import ChangesPanel from "../changes/ChangesPanel";
 import CommitPanel from "../commits/CommitPanel";
 import EmptyState from "../common/EmptyState";
+import TagsPanel from "../tags/TagsPanel";
 import RepoStateBanner from "./RepoStateBanner";
 import StatusBar from "./StatusBar";
 
@@ -84,7 +85,15 @@ export default function WorkspacePanel() {
     <section className="flex h-full min-h-0 flex-col overflow-hidden bg-panel">
       <RepoStateBanner />
       <div className="min-h-0 flex-1">
-        {pane === "changes" ? <ChangesPanel /> : pane === "commits" ? <CommitPanel /> : <BranchPanel />}
+        {pane === "changes" ? (
+          <ChangesPanel />
+        ) : pane === "commits" ? (
+          <CommitPanel />
+        ) : pane === "tags" ? (
+          <TagsPanel />
+        ) : (
+          <BranchPanel />
+        )}
       </div>
       <StatusBar />
     </section>

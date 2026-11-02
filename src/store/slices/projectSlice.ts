@@ -13,6 +13,7 @@ import {
   invalidateCaches,
   pickActive,
   REMOTE_PAGE,
+  TAG_PAGE,
   token,
   upsertProject,
 } from "../shared";
@@ -78,6 +79,14 @@ export const createProjectSlice: StateCreator<AppState, [], [], ProjectSlice> = 
         repoState: null,
         stashEntries: [],
         tags: [],
+        tagsLoading: false,
+        tagLimit: TAG_PAGE,
+        tagFilter: "",
+        tagTarget: null,
+        tagBusy: null,
+        tagPushingAll: false,
+        tagRemote: null,
+        tagRemoteLoading: false,
         reflog: [],
         changes: null,
         ...reset,
@@ -86,22 +95,27 @@ export const createProjectSlice: StateCreator<AppState, [], [], ProjectSlice> = 
 
       // Settle independently: a failed worktree scan must not hide the branch
       // list, and a failed branch scan must not block the repository footer.
-      const [snapshotResult, branchesResult, changesResult] = await Promise.allSettled([
+      // Tags ride along so the tags pane has its list ready without a second read.
+      const [snapshotResult, branchesResult, changesResult, tagsResult] = await Promise.allSettled([
         api.repoSnapshot(project.path),
         api.listBranches(project.path),
         api.worktreeStatus(project.path),
+        api.listTags(project.path),
       ]);
       if (epoch !== token.project) return;
 
       const snapshot = snapshotResult.status === "fulfilled" ? snapshotResult.value : null;
       const branches = branchesResult.status === "fulfilled" ? branchesResult.value : [];
       const changes = changesResult.status === "fulfilled" ? changesResult.value : null;
+      const tags = tagsResult.status === "fulfilled" ? tagsResult.value : [];
 
       set((state) => ({
         snapshot,
         branches,
         changes,
+        tags,
         branchesLoading: false,
+        tagsLoading: false,
         projects: state.projects.map((item) =>
           item.id === project.id && snapshot
             ? {
@@ -240,6 +254,7 @@ export const createProjectSlice: StateCreator<AppState, [], [], ProjectSlice> = 
         set({ projects: list.projects, activeProject: null });
         if (active) await get().loadProject(active);
         if (get().pane === "changes") await get().refreshChanges();
+        if (get().pane === "tags") await get().refreshTags();
         notify("info", t("store.refreshed"));
       } catch (error) {
         fail(t("store.refreshFailed"), error);

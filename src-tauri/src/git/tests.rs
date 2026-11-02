@@ -5,7 +5,7 @@ use std::process::Command;
 use git2::{Oid, Repository};
 use tempfile::TempDir;
 
-use crate::git::{branches, commits, diff, ops, repo as git_repo, status};
+use crate::git::{branches, commits, diff, ops, repo as git_repo, status, workflow};
 use crate::model::FileStatus;
 
 fn init_repo() -> (TempDir, Repository) {
@@ -445,4 +445,119 @@ fn squash_rejects_folding_every_commit() {
     assert_eq!(result.squashed, 2);
     let log = ops::squash_preview(&repo, "main").expect("preview");
     assert_eq!(log.total_commits, 2, "3 commits folded into a + one");
+}
+
+// ---------------------------------------------------------------------------
+// tags
+// ---------------------------------------------------------------------------
+
+/// Lightweight and annotated tags must both report the peeled commit: the row
+/// shows its summary, and a lightweight tag borrows the commit time so it does
+/// not sink below every annotated tag in the list.
+#[test]
+fn tags_report_annotation_commit_summary_and_time() {
+    let (dir, repo) = workspace();
+    stage_file(&repo, "README.md", "hello\nworld\n");
+    let sha = commit(&repo, "feat: second commit");
+
+    let head = repo.find_commit(sha).expect("head commit");
+    let head_object = head.as_object();
+    repo.tag_lightweight("v1", head_object, false)
+        .expect("lightweight tag");
+
+    let annotated_tagger_time = 1_600_000_000;
+    let tagger = git2::Signature::new(
+        "Test",
+        "test@example.com",
+        &git2::Time::new(annotated_tagger_time, 0),
+    )
+    .expect("signature");
+    repo.tag("v2", head_object, &tagger, "release 2", false)
+        .expect("annotated tag");
+
+    let tags = workflow::list_tags(&repo).expect("list tags");
+    assert_eq!(tags.len(), 2);
+
+    let lightweight = tags.iter().find(|tag| tag.name == "v1").expect("v1");
+    assert!(!lightweight.annotated);
+    assert_eq!(lightweight.sha, sha.to_string());
+    assert_eq!(
+        lightweight.commit_summary.as_deref(),
+        Some("feat: second commit")
+    );
+    assert!(
+        lightweight.created_at.is_some(),
+        "commit time stands in for the tagger time"
+    );
+
+    let annotated = tags.iter().find(|tag| tag.name == "v2").expect("v2");
+    assert!(annotated.annotated);
+    assert_eq!(annotated.message.as_deref(), Some("release 2"));
+    assert_eq!(
+        annotated.commit_summary.as_deref(),
+        Some("feat: second commit")
+    );
+
+    // A lightweight tag borrows the commit time, an annotated one keeps its own.
+    assert_eq!(lightweight.created_at, Some(head.time().seconds()));
+    assert_eq!(annotated.created_at, Some(annotated_tagger_time));
+    assert_eq!(annotated.commit_time, Some(head.time().seconds()));
+    assert!(dir.path().join("README.md").is_file());
+}
+
+/// The remote comparison reads `git ls-remote --tags`, so annotated tags have to
+/// come back as their peeled commit — not as the tag object id.
+#[test]
+fn remote_tag_list_peels_annotated_tags() {
+    let (dir, repo) = workspace();
+    let remote_dir = tempfile::tempdir().expect("remote dir");
+    Repository::init_bare(remote_dir.path()).expect("init bare remote");
+    repo.remote("origin", remote_dir.path().to_str().unwrap())
+        .expect("remote");
+
+    let head = repo.head().unwrap().peel_to_commit().unwrap();
+    let head_object = head.as_object();
+    repo.tag_lightweight("v1.0.0", head_object, false)
+        .expect("lightweight tag");
+    let tagger = git2::Signature::now("Test", "test@example.com").expect("signature");
+    repo.tag("v1.1.0", head_object, &tagger, "release 1.1", false)
+        .expect("annotated tag");
+
+    let output = Command::new("git")
+        .arg("-C")
+        .arg(dir.path())
+        .args(["push", "origin", "--tags"])
+        .output()
+        .expect("run git push");
+    assert!(
+        output.status.success(),
+        "git push --tags failed: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+
+    let page = workflow::list_remote_tags(dir.path()).expect("remote tags");
+    assert_eq!(page.remote.as_deref(), Some("origin"));
+    assert!(page.failure.is_none(), "{:?}", page.failure);
+
+    let mut names: Vec<&str> = page.tags.iter().map(|tag| tag.name.as_str()).collect();
+    names.sort_unstable();
+    assert_eq!(names, vec!["v1.0.0", "v1.1.0"]);
+    for tag in &page.tags {
+        assert_eq!(
+            tag.sha,
+            head.id().to_string(),
+            "{} must peel to the commit",
+            tag.name
+        );
+    }
+}
+
+/// No remote is a normal state: an empty page with `remote == None`, not an error.
+#[test]
+fn remote_tag_list_without_a_remote_is_empty() {
+    let (dir, _repo) = workspace();
+    let page = workflow::list_remote_tags(dir.path()).expect("remote tags");
+    assert!(page.remote.is_none());
+    assert!(page.tags.is_empty());
+    assert!(page.failure.is_none());
 }

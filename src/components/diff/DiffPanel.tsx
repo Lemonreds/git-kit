@@ -19,7 +19,6 @@ import {
 import { useT } from "../../i18n";
 import { api } from "../../lib/ipc";
 import type { CommitDetail } from "../../lib/types";
-import TagDialog from "../branches/TagDialog";
 
 import { absoluteTime, copyText, formatCount, timeTooltip } from "../../lib/format";
 import { useAppStore } from "../../store/appStore";
@@ -70,6 +69,8 @@ export default function DiffPanel() {
   const notify = useAppStore((state) => state.notify);
   const showAlert = useAppStore((state) => state.showAlert);
   const revertCommit = useAppStore((state) => state.revertCommit);
+  // Tagging this commit jumps to the tags pane with the create form pre-filled.
+  const openTags = useAppStore((state) => state.openTags);
 
   const [confirmDiscard, setConfirmDiscard] = useState(false);
 
@@ -119,7 +120,6 @@ export default function DiffPanel() {
   const [searchFocusKey, setSearchFocusKey] = useState(0);
   const [detailOpen, setDetailOpen] = useState(false);
   const [detail, setDetail] = useState<CommitDetail | null>(null);
-  const [tagOpen, setTagOpen] = useState(false);
   const [confirmRevert, setConfirmRevert] = useState(false);
 
   useEffect(() => {
@@ -410,7 +410,7 @@ export default function DiffPanel() {
           <div className="mt-1.5 flex items-center gap-1.5">
             <button
               type="button"
-              onClick={() => setTagOpen(true)}
+              onClick={() => openTags(selectedCommitSha)}
               className="inline-flex items-center gap-1 rounded-md border border-line px-1.5 py-0.5 text-[10.5px] text-ink-soft transition-colors hover:border-accent/40 hover:text-accent"
             >
               <Tag size={10} />
@@ -467,10 +467,6 @@ export default function DiffPanel() {
           </div>
         </div>
       )}
-
-      {tagOpen && selectedCommitSha ? (
-        <TagDialog defaultTarget={selectedCommitSha} onClose={() => setTagOpen(false)} />
-      ) : null}
 
       <ConfirmDialog
         open={confirmRevert}

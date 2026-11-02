@@ -116,6 +116,8 @@ pub fn run() {
             commands::create_tag,
             commands::delete_tag,
             commands::push_tag,
+            commands::list_remote_tags,
+            commands::push_all_tags,
             commands::reflog_entries,
             commands::reset_to,
             commands::compare_refs,

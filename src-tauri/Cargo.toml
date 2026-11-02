@@ -1,6 +1,6 @@
 [package]
 name = "git-kit"
-version = "0.0.2"
+version = "0.0.3"
 description = "Git Kit — a git client for company workflows"
 authors = ["Aitify"]
 edition = "2024"
@@ -27,7 +27,12 @@ thiserror = "2"
 chrono = { version = "0.4", default-features = false, features = ["clock"] }
 uuid = { version = "1", features = ["v4"] }
 # Local-repository only: skip libgit2's https/ssh stack to keep the build light.
-git2 = { version = "0.20", default-features = false }
+# `vendored-libgit2` is deliberate: without it the crate links whatever
+# `pkg-config` finds on the build machine (Homebrew's /usr/local/opt/libgit2),
+# which makes the .app depend on a local Homebrew install — and macOS then kills
+# the app when that dylib is not (ad-hoc) signed. Vendored = static libgit2, so
+# the bundle runs on any Mac.
+git2 = { version = "0.20", default-features = false, features = ["vendored-libgit2"] }
 # Pseudo terminals for the built-in terminal: openpty on macOS/Linux, ConPTY on
 # Windows (needs Windows 10 1809+). One API for every target.
 portable-pty = "0.9"

@@ -23,7 +23,9 @@ export const zh = {
   "workspace.remove": "移除项目",
 
   "workspace.tabBranches": "分支",
+  "workspace.tabTags": "标签",
   "workspace.tabChanges": "改动",
+  "workspace.tagsTip": "查看本仓库的全部标签，支持搜索、新建与删除",
   "workspace.changesTip": "当前分支的未提交改动",
 
   "workspace.opMerge": "Merge 进行中",
@@ -70,7 +72,9 @@ export const en: Record<keyof typeof zh, Message> = {
   "workspace.remove": "Remove project",
 
   "workspace.tabBranches": "Branches",
+  "workspace.tabTags": "Tags",
   "workspace.tabChanges": "Changes",
+  "workspace.tagsTip": "All tags of this repository — search, create and delete",
   "workspace.changesTip": "Uncommitted changes on the current branch",
 
   "workspace.opMerge": "Merge in progress",

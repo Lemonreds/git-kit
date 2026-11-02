@@ -123,17 +123,18 @@ jobs:
           # 注意：不能用 dist/ —— 那是 Vite 的前端构建目录
           out="artifacts"
           rm -rf "$out" && mkdir -p "$out"
-          ditto -c -k --keepParent "$bundle/macos/Git Kit.app" "$out/Git-Kit-$VERSION-universal.zip"
+          # 发布文件名统一带版本号：Git-Kit-v<version>-universal.zip / .dmg
+          ditto -c -k --keepParent "$bundle/macos/Git Kit.app" "$out/Git-Kit-v$VERSION-universal.zip"
 
           if ls "$bundle"/dmg/*.dmg >/dev/null 2>&1; then
-            cp "$bundle"/dmg/*.dmg "$out"/
+            cp "$(ls "$bundle"/dmg/*.dmg | head -1)" "$out/Git-Kit-v$VERSION-universal.dmg"
           else
             echo "tauri 没有产出 dmg，改用 hdiutil 生成"
             hdiutil create -volname "Git Kit" -srcfolder "$bundle/macos/Git Kit.app" \
-              -ov -format UDZO "$out/Git-Kit-$VERSION-universal.dmg"
+              -ov -format UDZO "$out/Git-Kit-v$VERSION-universal.dmg"
           fi
 
-          ( cd "$out" && shasum -a 256 ./*.zip ./*.dmg > SHA256SUMS-macos.txt && ls -lh )
+          ( cd "$out" && shasum -a 256 ./*.zip ./*.dmg > "SHA256SUMS-v$VERSION-macos.txt" && ls -lh )
 
       - uses: actions/upload-artifact@v4
         with:
@@ -202,7 +203,7 @@ jobs:
           $files | ForEach-Object { Copy-Item $_.FullName $out }
           Get-ChildItem $out -File |
             ForEach-Object { "$((Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLower())  $($_.Name)" } |
-            Set-Content -Path "$out/SHA256SUMS-windows.txt" -Encoding ASCII
+            Set-Content -Path "$out/SHA256SUMS-v$env:VERSION-windows.txt" -Encoding ASCII
           Get-ChildItem $out -File | ForEach-Object { Write-Host "$($_.Name)  $([math]::Round($_.Length / 1MB, 2)) MB" }
 
       - uses: actions/upload-artifact@v4

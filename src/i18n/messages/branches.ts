@@ -22,8 +22,6 @@ export const zh = {
   "branches.syncRemoteStatus": "同步远程状态",
 
   // Branch panel
-  "branches.localCount": "本地 {count}",
-  "branches.remoteCountSuffix": " · 远程 {count}",
   "branches.fetchAll": "拉取所有远程引用（git fetch --all --prune）",
   "branches.newBranch": "新建分支",
   "branches.deleteBranch": "删除分支",
@@ -317,30 +315,6 @@ export const zh = {
   "branches.commitMessage": "提交信息",
   "branches.oldestCommitHint": "默认取最旧提交",
 
-  // Tag dialog
-  "branches.tagsTitle": "标签",
-  "branches.tagsCurrentRepo": "当前仓库的标签",
-  "branches.existingTags": "已有标签",
-  "branches.tagCount": {
-    one: "{count} 个",
-    other: "{count} 个",
-  },
-  "branches.noTags": "还没有标签",
-  "branches.annotatedTag": "附注",
-  "branches.pushTag": "推送该标签到远程",
-  "branches.deleteTag": "删除标签",
-  "branches.newTag": "新建标签",
-  "branches.tagName": "标签名",
-  "branches.tagTarget": "目标（分支 / 提交）",
-  "branches.tagMessage": "说明（填写则创建附注标签）",
-  "branches.tagMessagePlaceholder": "例如：生产发布 2026-10-29",
-  "branches.createTag": "创建标签",
-  "branches.confirmDeleteTagTitle": "删除标签 {name}？",
-  "branches.deleteTagRemoteBody": "本地标签会先删除，随后执行 git push origin --delete 删除 origin 上的同名标签；远程标签删除后无法从远程恢复。",
-  "branches.deleteTagLocalBody": "只删除本地标签，origin 上的同名标签不受影响。",
-  "branches.deleteTagRemoteLabel": "同时删除 origin 上的同名标签",
-  "branches.deleteTagRemoteHint": "默认不勾选；勾选后远程标签一并删除，且无法在远程恢复。",
-
   // Reflog dialog
   "branches.reflogSubtitle": "误 rebase / reset / squash 后，可以从这里回到任意一次 HEAD",
   "branches.noReflog": "没有操作记录",
@@ -378,8 +352,6 @@ export const en: Record<keyof typeof zh, Message> = {
   "branches.syncRemoteStatus": "Sync remote status",
 
   // Branch panel
-  "branches.localCount": "{count} local",
-  "branches.remoteCountSuffix": " · {count} remote",
   "branches.fetchAll": "Fetch all remote refs (git fetch --all --prune)",
   "branches.newBranch": "New branch",
   "branches.deleteBranch": "Delete branches",
@@ -669,27 +641,6 @@ export const en: Record<keyof typeof zh, Message> = {
   "branches.noSquashCommits": "No commits to squash",
   "branches.commitMessage": "Commit message",
   "branches.oldestCommitHint": "The oldest commit by default",
-
-  // Tag dialog
-  "branches.tagsTitle": "Tags",
-  "branches.tagsCurrentRepo": "Tags of the current repository",
-  "branches.existingTags": "Existing tags",
-  "branches.tagCount": { one: "{count} tag", other: "{count} tags" },
-  "branches.noTags": "No tags yet",
-  "branches.annotatedTag": "annotated",
-  "branches.pushTag": "Push this tag to the remote",
-  "branches.deleteTag": "Delete tag",
-  "branches.newTag": "New tag",
-  "branches.tagName": "Tag name",
-  "branches.tagTarget": "Target (branch / commit)",
-  "branches.tagMessage": "Description (fills in an annotated tag)",
-  "branches.tagMessagePlaceholder": "e.g. production release 2026-10-29",
-  "branches.createTag": "Create tag",
-  "branches.confirmDeleteTagTitle": "Delete tag {name}?",
-  "branches.deleteTagRemoteBody": "The local tag is deleted first, then git push origin --delete removes the same-named tag from origin; a deleted remote tag cannot be restored from the remote.",
-  "branches.deleteTagLocalBody": "Only the local tag is deleted, the same-named tag on origin is untouched.",
-  "branches.deleteTagRemoteLabel": "Also delete the same-named tag on origin",
-  "branches.deleteTagRemoteHint": "Unchecked by default; when checked the remote tag is deleted too and cannot be restored on the remote.",
 
   // Reflog dialog
   "branches.reflogSubtitle": "After a mistaken rebase / reset / squash you can return to any of these HEAD positions",

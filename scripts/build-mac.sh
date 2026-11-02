@@ -11,6 +11,8 @@
 #   bash scripts/build-mac.sh --universal --open
 #
 # 产物统一输出到 ./release/，并附带 .zip（方便分发）与 SHA256 校验文件。
+# 文件名统一带版本号：Git-Kit-v0.0.3-x64.dmg / Git-Kit-v0.0.3.zip / SHA256SUMS-v0.0.3.txt
+# （.app 保持「Git Kit.app」不变，安装后的应用名才不会被版本号污染。）
 #
 set -euo pipefail
 
@@ -88,6 +90,25 @@ PRODUCT_NAME="$(node -p "require('./$CONF').productName")"
 APP_VERSION="$(node -p "require('./$CONF').version")"
 IDENTIFIER="$(node -p "require('./$CONF').identifier")"
 BUNDLE_ID_SUFFIX=""
+
+# ---------- 产物命名 ----------
+# 每个可分发文件都带上版本号（并带平台架构），下载目录里一眼就能分清
+# 哪个版本、哪种架构，不用打开 dmg 才知道。
+SLUG="${PRODUCT_NAME// /-}"
+if [[ "$UNIVERSAL" -eq 1 ]]; then
+  DMG_ARCH="universal"
+  ARCH_SUFFIX="-universal"
+else
+  case "$(uname -m)" in
+    x86_64|amd64)  DMG_ARCH="x64" ;;
+    arm64|aarch64) DMG_ARCH="aarch64" ;;
+    *)             DMG_ARCH="$(uname -m)" ;;
+  esac
+  ARCH_SUFFIX=""
+fi
+DMG_NAME="${SLUG}-v${APP_VERSION}-${DMG_ARCH}.dmg"
+ZIP_NAME="${SLUG}-v${APP_VERSION}${ARCH_SUFFIX}.zip"
+SUMS_NAME="SHA256SUMS-v${APP_VERSION}.txt"
 
 info "Git Kit v$APP_VERSION（$IDENTIFIER）"
 
@@ -167,23 +188,33 @@ if [[ "$BUNDLES" == *dmg* ]]; then
   DMGS=("$DMG_DIR"/*.dmg)
   shopt -u nullglob
   [[ ${#DMGS[@]} -gt 0 ]] || die "dmg 目录为空：$DMG_DIR"
+  index=0
   for d in "${DMGS[@]}"; do
-    cp "$d" "$RELEASE_DIR/"
+    # Tauri 自己生成的名字是「Git Kit_0.0.3_x64.dmg」：声明式地重命名成
+    # 带 v 前缀、连字符分隔的发布文件名；多份 dmg 时追加序号避免覆盖。
+    if [[ $index -eq 0 ]]; then
+      target_name="$DMG_NAME"
+    else
+      target_name="${DMG_NAME%.dmg}-$((index + 1)).dmg"
+    fi
+    cp "$d" "$RELEASE_DIR/$target_name"
+    index=$((index + 1))
   done
 fi
 
-# .app 打成 zip，便于分发与保留签名/权限位
-ZIP_SUFFIX=""
-if [[ "$UNIVERSAL" -eq 1 ]]; then
-  ZIP_SUFFIX="-universal"
-fi
-ZIP_NAME="${PRODUCT_NAME// /-}-${APP_VERSION}${ZIP_SUFFIX}.zip"
+# .app 打成 zip，便于分发并保留签名 / 权限位（zip 内仍是「Git Kit.app」）
 ditto -c -k --keepParent "$APP_PATH" "$RELEASE_DIR/$ZIP_NAME"
 
 # ---------- 校验与报告 ----------
+# 只对可分发文件求校验值：把校验文件自己也列进去会得到一个永远对不上的自引用条目。
 (
   cd "$RELEASE_DIR"
-  shasum -a 256 * > SHA256SUMS.txt 2>/dev/null || true
+  : > "$SUMS_NAME"
+  shopt -s nullglob
+  for f in *.dmg *.zip; do
+    shasum -a 256 "$f" >> "$SUMS_NAME"
+  done
+  shopt -u nullglob
 )
 
 APP_BIN="$(/usr/libexec/PlistBuddy -c "Print :CFBundleExecutable" "$RELEASE_DIR/$PRODUCT_NAME.app/Contents/Info.plist" 2>/dev/null || echo "$PRODUCT_NAME")"
@@ -195,12 +226,14 @@ ok "打包完成 → $RELEASE_DIR"
 echo "  应用：$PRODUCT_NAME.app   架构：$ARCH_INFO"
 [[ -n "$SIGN_INFO" ]] && echo "  签名：$(echo "$SIGN_INFO" | tr '\n' ' ')"
 if [[ "$BUNDLES" == *dmg* ]]; then
-  ls -1 "$RELEASE_DIR"/*.dmg | while read -r f; do
+  shopt -s nullglob
+  for f in "$RELEASE_DIR"/*.dmg; do
     echo "  安装包：$(basename "$f")  $(du -h "$f" | cut -f1)"
   done
+  shopt -u nullglob
 fi
 echo "  压缩包：$ZIP_NAME  $(du -h "$RELEASE_DIR/$ZIP_NAME" | cut -f1)"
-echo "  校验值：release/SHA256SUMS.txt"
+echo "  校验值：release/$SUMS_NAME"
 echo
 echo "  安装方式：打开 .dmg，把「$PRODUCT_NAME」拖到 Applications。"
 echo "  若提示「已损坏」或「无法验证开发者」（下载后被加隔离标记），执行："

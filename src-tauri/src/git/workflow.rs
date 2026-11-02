@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -6,7 +7,8 @@ use git2::{BranchType, Oid, Repository};
 use crate::error::AppError;
 use crate::model::{
     CommitResult, ComparePreview, DeleteTagResult, HeadCommitPreview, MergePreview, MergeResult,
-    ReflogEntry, RepoOperationState, ResetResult, StashEntry, StashList, TagInfo,
+    PushAllTagsResult, ReflogEntry, RemoteTag, RemoteTagPage, RepoOperationState, ResetResult,
+    StashEntry, StashList, TagInfo,
 };
 
 use super::cli::{NETWORK_TIMEOUT, run, run_blocking};
@@ -556,6 +558,18 @@ pub fn revert_commit(repo_path: &Path, sha: &str) -> Result<CommitResult, AppErr
 
 // --- tags ------------------------------------------------------------------
 
+/// The remote tag operations talk to: the upstream of the current branch, else
+/// the first configured remote. `None` means the repository has no remote at all.
+fn tag_remote(repo: &Repository) -> Option<String> {
+    head_branch(repo)
+        .and_then(|branch| resolve_remote(repo, &branch))
+        .or_else(|| {
+            repo.remotes()
+                .ok()
+                .and_then(|names| names.iter().flatten().next().map(str::to_string))
+        })
+}
+
 pub fn list_tags(repo: &Repository) -> Result<Vec<TagInfo>, AppError> {
     let names = repo.tag_names(None)?;
     let mut tags = Vec::new();
@@ -565,12 +579,17 @@ pub fn list_tags(repo: &Repository) -> Result<Vec<TagInfo>, AppError> {
         let Ok(reference) = repo.find_reference(&refname) else {
             continue;
         };
-        let Ok(object) = reference.peel(git2::ObjectType::Any) else {
+        // Peel to `Any` dereferences the tag object all the way to the commit,
+        // so the annotation is detected on the raw target instead.
+        let Some(target) = reference.target() else {
             continue;
         };
-        let annotated = object.kind() == Some(git2::ObjectType::Tag);
+        let Ok(raw) = repo.find_object(target, None) else {
+            continue;
+        };
+        let annotated = raw.kind() == Some(git2::ObjectType::Tag);
         let (message, created_at) = if annotated {
-            match object.into_tag() {
+            match raw.into_tag() {
                 Ok(tag) => (
                     tag.message().map(|value| value.trim().to_string()),
                     tag.tagger().map(|signature| signature.when().seconds()),
@@ -591,8 +610,13 @@ pub fn list_tags(repo: &Repository) -> Result<Vec<TagInfo>, AppError> {
             short_sha: short_id(&commit),
             annotated,
             message,
-            created_at,
+            // A lightweight tag has no tagger time: the commit time keeps the
+            // list ordered by "when the release happened" instead of sinking
+            // every lightweight tag below every annotated one.
+            created_at: created_at.or(Some(commit.time().seconds())),
             target: None,
+            commit_summary: commit.summary().map(str::to_string),
+            commit_time: Some(commit.time().seconds()),
         });
     }
 
@@ -603,6 +627,99 @@ pub fn list_tags(repo: &Repository) -> Result<Vec<TagInfo>, AppError> {
             .then_with(|| a.name.cmp(&b.name))
     });
     Ok(tags)
+}
+
+/// Split `git ls-remote --tags` output into `name -> commit id`.
+///
+/// Annotated tags appear twice (`refs/tags/x` and `refs/tags/x^{}`); the peeled
+/// line is the commit, so it wins. Everything else (dereference noise, empty
+/// lines) is ignored.
+fn parse_remote_tags(stdout: &str) -> Vec<RemoteTag> {
+    let mut peeled: HashMap<String, String> = HashMap::new();
+    let mut direct: HashMap<String, String> = HashMap::new();
+
+    for line in stdout.lines() {
+        let Some((sha, refname)) = line.split_once('\t').or_else(|| line.split_once(' ')) else {
+            continue;
+        };
+        let Some(name) = refname.trim().strip_prefix("refs/tags/") else {
+            continue;
+        };
+        match name.strip_suffix("^{}") {
+            Some(base) => {
+                peeled.insert(base.to_string(), sha.trim().to_string());
+            }
+            None => {
+                direct.insert(name.to_string(), sha.trim().to_string());
+            }
+        }
+    }
+
+    let mut tags: Vec<RemoteTag> = direct
+        .into_iter()
+        .map(|(name, sha)| {
+            let sha = peeled.get(&name).cloned().unwrap_or(sha);
+            RemoteTag { name, sha }
+        })
+        .collect();
+    tags.sort_by(|a, b| a.name.cmp(&b.name));
+    tags
+}
+
+/// Tags that exist on the remote, so the UI can tell "not pushed yet" from
+/// "same on both sides".
+///
+/// This is the only tag read that touches the network, so it only runs when the
+/// user asks for it; a failing read comes back as `failure` instead of an error.
+pub fn list_remote_tags(repo_path: &Path) -> Result<RemoteTagPage, AppError> {
+    let repo = open(repo_path)?;
+    let Some(remote) = tag_remote(&repo) else {
+        return Ok(RemoteTagPage {
+            remote: None,
+            tags: Vec::new(),
+            failure: None,
+        });
+    };
+
+    match run(
+        repo_path,
+        &["ls-remote", "--tags", remote.as_str()],
+        Some(NETWORK_TIMEOUT),
+    ) {
+        Ok(output) => Ok(RemoteTagPage {
+            remote: Some(remote),
+            tags: parse_remote_tags(&output.stdout),
+            failure: None,
+        }),
+        Err(error) => Ok(RemoteTagPage {
+            remote: Some(remote),
+            tags: Vec::new(),
+            failure: Some(command_detail(&error)),
+        }),
+    }
+}
+
+/// `git push <remote> --tags`: covers every tag that is missing on the remote in
+/// one round trip (a release often cuts several tags at once).
+pub fn push_all_tags(repo_path: &Path) -> Result<PushAllTagsResult, AppError> {
+    let repo = open(repo_path)?;
+    let remote = tag_remote(&repo)
+        .ok_or_else(|| AppError::message("该仓库没有配置远程地址，无法推送标签"))?;
+    let pushed = list_tags(&repo)?.len();
+
+    run(
+        repo_path,
+        &["push", remote.as_str(), "--tags"],
+        Some(NETWORK_TIMEOUT),
+    )
+    .map_err(|error| {
+        AppError::CommandFailed(format!(
+            "推送全部标签到 {remote} 失败：{}",
+            command_detail(&error)
+        ))
+    })?;
+
+    Ok(PushAllTagsResult { remote, pushed })
 }
 
 fn validate_tag_name(name: &str) -> Result<(), AppError> {
@@ -651,7 +768,7 @@ pub fn create_tag(
     list_tags(&repo)
 }
 
-/// Delete a tag locally and — when asked — the same tag on `origin`.
+/// Delete a tag locally and — when asked — the same tag on the remote.
 ///
 /// The local deletion always runs first: a missing remote must not leave the tag
 /// in place locally. The remote outcome is reported separately so the UI can say
@@ -670,24 +787,27 @@ pub fn delete_tag(
     let mut remote_failure: Option<String> = None;
     if delete_remote {
         let repo = open(repo_path)?;
-        if repo.find_remote("origin").is_err() {
-            remote_failure = Some("该仓库没有 origin 远程，只删除了本地标签".to_string());
-        } else {
-            let refspec = format!("refs/tags/{name}");
-            match run(
-                repo_path,
-                &["push", "origin", "--delete", refspec.as_str()],
-                Some(NETWORK_TIMEOUT),
-            ) {
-                Ok(_) => remote_deleted = true,
-                Err(error) => {
-                    let detail = command_detail(&error);
-                    let lower = detail.to_ascii_lowercase();
-                    // origin never had this tag: nothing to delete, not an error.
-                    if !(lower.contains("remote ref does not exist")
-                        || lower.contains("couldn't find remote ref"))
-                    {
-                        remote_failure = Some(detail);
+        match tag_remote(&repo) {
+            None => {
+                remote_failure = Some("该仓库没有远程地址，只删除了本地标签".to_string());
+            }
+            Some(remote) => {
+                let refspec = format!("refs/tags/{name}");
+                match run(
+                    repo_path,
+                    &["push", remote.as_str(), "--delete", refspec.as_str()],
+                    Some(NETWORK_TIMEOUT),
+                ) {
+                    Ok(_) => remote_deleted = true,
+                    Err(error) => {
+                        let detail = command_detail(&error);
+                        let lower = detail.to_ascii_lowercase();
+                        // The remote never had this tag: nothing to delete, not an error.
+                        if !(lower.contains("remote ref does not exist")
+                            || lower.contains("couldn't find remote ref"))
+                        {
+                            remote_failure = Some(detail);
+                        }
                     }
                 }
             }
@@ -705,13 +825,7 @@ pub fn delete_tag(
 pub fn push_tag(repo_path: &Path, name: &str) -> Result<String, AppError> {
     validate_tag_name(name)?;
     let repo = open(repo_path)?;
-    let remote = head_branch(&repo)
-        .and_then(|branch| resolve_remote(&repo, &branch))
-        .or_else(|| {
-            repo.remotes()
-                .ok()
-                .and_then(|names| names.iter().flatten().next().map(str::to_string))
-        })
+    let remote = tag_remote(&repo)
         .ok_or_else(|| AppError::message("该仓库没有配置远程地址，无法推送标签"))?;
 
     let refspec = format!("refs/tags/{name}");

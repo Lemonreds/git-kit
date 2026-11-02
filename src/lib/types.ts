@@ -218,8 +218,34 @@ export interface TagInfo {
   shortSha: string;
   annotated: boolean;
   message: string | null;
+  /** Tagger time for annotated tags, commit time for lightweight ones. */
   createdAt: number | null;
   target: string | null;
+  /** Summary of the commit the tag points at. */
+  commitSummary: string | null;
+  /** Committer time of the peeled commit. */
+  commitTime: number | null;
+}
+
+/** One tag that exists on the remote (`git ls-remote --tags`). */
+export interface RemoteTag {
+  name: string;
+  sha: string;
+}
+
+/** Remote tag list plus the reason it could not be read (soft failure). */
+export interface RemoteTagPage {
+  /** Remote the list was read from; `null` when the repo has no remote. */
+  remote: string | null;
+  tags: RemoteTag[];
+  failure: string | null;
+}
+
+/** Outcome of pushing every local tag at once. */
+export interface PushAllTagsResult {
+  remote: string;
+  /** Local tags present when the push ran (git skips up-to-date ones). */
+  pushed: number;
 }
 
 export interface ReflogEntry {

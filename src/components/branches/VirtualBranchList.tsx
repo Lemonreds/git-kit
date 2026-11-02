@@ -64,7 +64,9 @@ export default function VirtualBranchList({
 
   return (
     <List
-      className="h-full"
+      // Padding lives on the scroller itself (not on a padded parent), so the
+      // scrollbar sits flush against the pane edge — same as the plain lists.
+      className="h-full px-2 pb-3 pt-1"
       style={{ height: "100%" }}
       defaultHeight={480}
       rowCount={entries.length}

@@ -15,6 +15,12 @@ import type { PaneMode, ToastKind } from "./types";
 export const PAGE_SIZE = 50;
 /** Remote branches loaded per page; the load-more button adds this many. */
 export const REMOTE_PAGE = 10;
+/**
+ * Tags shown at first and added per "load more". Release-heavy repositories
+ * carry hundreds of tags; the whole list is already in memory, so a page is
+ * just how much of it the list is allowed to render at once.
+ */
+export const TAG_PAGE = 20;
 
 /**
  * Small per-session caches. Re-opening the same branch / commit / file must not
@@ -109,6 +115,7 @@ export function clearDetail() {
   return {
     pane: "branches" as PaneMode,
     selectedBranch: null,
+    selectedTag: null,
     commits: [] as CommitPage["commits"],
     commitsLoading: false,
     commitsHasMore: false,
