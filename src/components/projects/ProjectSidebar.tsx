@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { ArrowUpDown, Check, FolderGit2, Plus } from "lucide-react";
+import { ArrowUpDown, Check, FolderGit2, Loader2, Plus } from "lucide-react";
 
 import { useT } from "../../i18n";
 import { groupProjects, projectSortLabel } from "../../lib/sortProjects";
@@ -16,17 +16,21 @@ const SORT_OPTIONS: ProjectSort[] = ["recent", "name", "added"];
 
 export default function ProjectSidebar() {
   const t = useT();
-  const { projects, projectSort, activeId, liveTerminalIds } = useSlice((state) => ({
-    projects: state.projects,
-    projectSort: state.projectSort,
-    activeId: state.activeProject?.id ?? null,
-    // Joined into a primitive so this selector stays referentially stable: an
-    // array would make `useShallow` re-render the sidebar on every store write.
-    liveTerminalIds: state.terminals
-      .filter((tab) => tab.status === "live")
-      .map((tab) => tab.projectId)
-      .join("\u0000"),
-  }));
+  const { projects, projectSort, activeId, liveTerminalIds, adding, relinkingId } = useSlice(
+    (state) => ({
+      projects: state.projects,
+      projectSort: state.projectSort,
+      activeId: state.activeProject?.id ?? null,
+      adding: state.addingProject,
+      relinkingId: state.relinkingId,
+      // Joined into a primitive so this selector stays referentially stable: an
+      // array would make `useShallow` re-render the sidebar on every store write.
+      liveTerminalIds: state.terminals
+        .filter((tab) => tab.status === "live")
+        .map((tab) => tab.projectId)
+        .join("\u0000"),
+    }),
+  );
 
   const setProjectSort = useAppStore((state) => state.setProjectSort);
   const addProject = useAppStore((state) => state.addProject);
@@ -57,6 +61,7 @@ export default function ProjectSidebar() {
       key={project.id}
       project={project}
       active={project.id === activeId}
+      relinking={relinkingId === project.id}
       terminalOpen={withTerminal.has(project.id)}
       onSelect={() => void selectProject(project.id)}
       onRemove={() => setPendingRemoval(project)}
@@ -92,9 +97,18 @@ export default function ProjectSidebar() {
           <IconButton
             label={t("projects.addProject")}
             shortcut="⌘O"
+            // The native folder sheet takes a moment to appear: the button has
+            // to admit the click immediately, so it spins until the sheet is up.
+            // Inert rather than `disabled` so the spinner keeps its full colour.
+            aria-busy={adding}
+            className={adding ? "pointer-events-none" : undefined}
             onClick={() => void addProject()}
           >
-            <Plus size={14} strokeWidth={2.2} />
+            {adding ? (
+              <Loader2 size={14} className="animate-spin" />
+            ) : (
+              <Plus size={14} strokeWidth={2.2} />
+            )}
           </IconButton>
         </div>
 
@@ -138,11 +152,17 @@ export default function ProjectSidebar() {
         {projects.length === 0 ? (
           <button
             type="button"
+            disabled={adding}
+            aria-busy={adding}
             onClick={() => void addProject()}
-            className="group mt-1 flex w-full flex-col items-center gap-2 rounded-xl border border-dashed border-line-strong/70 bg-panel/40 px-4 py-6 text-center transition-colors hover:border-accent/50 hover:bg-accent-soft/40"
+            className="group mt-1 flex w-full flex-col items-center gap-2 rounded-xl border border-dashed border-line-strong/70 bg-panel/40 px-4 py-6 text-center transition-colors hover:border-accent/50 hover:bg-accent-soft/40 disabled:cursor-default disabled:hover:border-line-strong/70 disabled:hover:bg-panel/40"
           >
             <span className="grid h-9 w-9 place-items-center rounded-xl border border-line bg-panel text-ink-faint transition-colors group-hover:text-accent">
-              <FolderGit2 size={16} />
+              {adding ? (
+                <Loader2 size={16} className="animate-spin" />
+              ) : (
+                <FolderGit2 size={16} />
+              )}
             </span>
             <span className="text-[12px] font-medium text-ink">{t("projects.addRepo")}</span>
             <span className="text-[10.5px] leading-relaxed text-ink-faint">

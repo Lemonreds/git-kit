@@ -23,6 +23,10 @@ export interface ProjectSlice {
   projects: Project[];
   projectSort: ProjectSort;
   activeProject: Project | null;
+  /** A native folder sheet is open for the "add project" action. */
+  addingProject: boolean;
+  /** A native folder sheet is open to relink this project. */
+  relinkingId: string | null;
 
   bootstrap: () => Promise<void>;
   loadProject: (project: Project) => Promise<void>;
@@ -39,11 +43,41 @@ export interface ProjectSlice {
 export const createProjectSlice: StateCreator<AppState, [], [], ProjectSlice> = (set, get) => {
   const { notify, fail } = feedback(get);
 
+  /**
+   * The native folder sheet, shared by "add project" and "relink".
+   *
+   * macOS builds the panel from scratch on every call and runs it as a modal
+   * session, so the click looks dead for a few hundred milliseconds. Callers
+   * therefore flag themselves busy first (the button that was clicked shows a
+   * spinner) and only then hand over to the system panel.
+   *
+   * The `busy` flag also serialises the two entry points: a second sheet while
+   * one is already open would be refused by AppKit and leave the UI stuck.
+   */
+  let picking = false;
+  const pickFolder = async (
+    title: string,
+    mark: (busy: boolean) => void,
+  ): Promise<string | null> => {
+    if (picking) return null;
+    picking = true;
+    mark(true);
+    try {
+      const selected = await open({ directory: true, multiple: false, title });
+      return typeof selected === "string" ? selected : null;
+    } finally {
+      mark(false);
+      picking = false;
+    }
+  };
+
   return {
     booted: false,
     projects: [],
     projectSort: (localStorage.getItem("gk.projectSort") as ProjectSort | null) ?? "recent",
     activeProject: null,
+    addingProject: false,
+    relinkingId: null,
 
     async bootstrap() {
       if (get().booted) return;
@@ -148,12 +182,10 @@ export const createProjectSlice: StateCreator<AppState, [], [], ProjectSlice> = 
 
     async addProject() {
       try {
-        const selected = await open({
-          directory: true,
-          multiple: false,
-          title: t("store.chooseRepoFolder"),
-        });
-        if (typeof selected !== "string") return;
+        const selected = await pickFolder(t("store.chooseRepoFolder"), (busy) =>
+          set({ addingProject: busy }),
+        );
+        if (selected === null) return;
 
         const project = await api.addProject(selected);
         set((state) => ({ projects: upsertProject(state.projects, project) }));
@@ -168,12 +200,11 @@ export const createProjectSlice: StateCreator<AppState, [], [], ProjectSlice> = 
       const project = get().projects.find((item) => item.id === id);
       if (!project) return;
       try {
-        const selected = await open({
-          directory: true,
-          multiple: false,
-          title: t("store.relinkFolderTitle", { name: project.name }),
-        });
-        if (typeof selected !== "string") return;
+        const selected = await pickFolder(
+          t("store.relinkFolderTitle", { name: project.name }),
+          (busy) => set({ relinkingId: busy ? id : null }),
+        );
+        if (selected === null) return;
 
         const next = await api.relinkProject(id, selected);
         // The shell sits in the old working directory, which may no longer exist.

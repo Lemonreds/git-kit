@@ -2,6 +2,7 @@ import {
   AlertTriangle,
   FolderGit2,
   FolderSearch,
+  Loader2,
   Pin,
   PinOff,
   SquareTerminal,
@@ -16,6 +17,8 @@ import IconButton from "../common/IconButton";
 interface ProjectRowProps {
   project: Project;
   active: boolean;
+  /** The native folder sheet is open for this project's relink action. */
+  relinking: boolean;
   /** A live shell (or panel tab) exists for this repository. */
   terminalOpen: boolean;
   onSelect: () => void;
@@ -28,6 +31,7 @@ interface ProjectRowProps {
 export default function ProjectRow({
   project,
   active,
+  relinking,
   terminalOpen,
   onSelect,
   onRemove,
@@ -108,8 +112,18 @@ export default function ProjectRow({
 
       <div className="absolute right-1.5 top-1/2 hidden -translate-y-1/2 items-center gap-0.5 rounded-md bg-raised/95 px-0.5 py-0.5 shadow-float group-hover:flex group-focus-within:flex">
         {unavailable ? (
-          <IconButton label={t("projects.relink")} size="sm" onClick={onRelink}>
-            <FolderSearch size={13} />
+          <IconButton
+            label={t("projects.relink")}
+            size="sm"
+            aria-busy={relinking}
+            className={relinking ? "pointer-events-none" : undefined}
+            onClick={onRelink}
+          >
+            {relinking ? (
+              <Loader2 size={13} className="animate-spin" />
+            ) : (
+              <FolderSearch size={13} />
+            )}
           </IconButton>
         ) : (
           <IconButton

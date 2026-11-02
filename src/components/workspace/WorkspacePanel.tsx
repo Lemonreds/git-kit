@@ -1,4 +1,4 @@
-import { AlertTriangle, FolderGit2, FolderSearch, Plus, Trash2 } from "lucide-react";
+import { AlertTriangle, FolderGit2, FolderSearch, Loader2, Plus, Trash2 } from "lucide-react";
 
 import { useT } from "../../i18n";
 import { useAppStore } from "../../store/appStore";
@@ -13,9 +13,11 @@ import StatusBar from "./StatusBar";
 
 export default function WorkspacePanel() {
   const t = useT();
-  const { project, pane } = useSlice((state) => ({
+  const { project, pane, adding, relinkingId } = useSlice((state) => ({
     project: state.activeProject,
     pane: state.pane,
+    adding: state.addingProject,
+    relinkingId: state.relinkingId,
   }));
 
   const addProject = useAppStore((state) => state.addProject);
@@ -32,10 +34,12 @@ export default function WorkspacePanel() {
         >
           <button
             type="button"
+            disabled={adding}
+            aria-busy={adding}
             onClick={() => void addProject()}
-            className="mt-1 inline-flex items-center gap-1.5 rounded-lg bg-accent px-3 py-1.5 text-[12px] font-medium text-white shadow-sm transition-opacity hover:opacity-90"
+            className="mt-1 inline-flex items-center gap-1.5 rounded-lg bg-accent px-3 py-1.5 text-[12px] font-medium text-white shadow-sm transition-opacity hover:opacity-90 disabled:cursor-default disabled:opacity-70"
           >
-            <Plus size={13} />
+            {adding ? <Loader2 size={13} className="animate-spin" /> : <Plus size={13} />}
             {t("workspace.addProject")}
           </button>
         </EmptyState>
@@ -61,10 +65,16 @@ export default function WorkspacePanel() {
           <div className="mt-1 flex items-center gap-2">
             <button
               type="button"
+              disabled={relinkingId === project.id}
+              aria-busy={relinkingId === project.id}
               onClick={() => void relinkProject(project.id)}
-              className="inline-flex items-center gap-1.5 rounded-lg bg-accent px-3 py-1.5 text-[12px] font-medium text-white transition-opacity hover:opacity-90"
+              className="inline-flex items-center gap-1.5 rounded-lg bg-accent px-3 py-1.5 text-[12px] font-medium text-white transition-opacity hover:opacity-90 disabled:cursor-default disabled:opacity-70"
             >
-              <FolderSearch size={13} />
+              {relinkingId === project.id ? (
+                <Loader2 size={13} className="animate-spin" />
+              ) : (
+                <FolderSearch size={13} />
+              )}
               {t("workspace.relink")}
             </button>
             <button
