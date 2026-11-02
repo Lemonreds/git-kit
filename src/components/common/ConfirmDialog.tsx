@@ -2,6 +2,8 @@ import { useEffect } from "react";
 import type { ReactNode } from "react";
 import { createPortal } from "react-dom";
 
+import { useT } from "../../i18n";
+
 interface ConfirmDialogProps {
   open: boolean;
   title: string;
@@ -19,13 +21,15 @@ export default function ConfirmDialog({
   open,
   title,
   description,
-  confirmLabel = "确认",
-  cancelLabel = "取消",
+  confirmLabel,
+  cancelLabel,
   tone = "default",
   children,
   onConfirm,
   onCancel,
 }: ConfirmDialogProps) {
+  const t = useT();
+
   useEffect(() => {
     if (!open) return undefined;
     const onKeyDown = (event: KeyboardEvent) => {
@@ -60,14 +64,14 @@ export default function ConfirmDialog({
             onClick={onCancel}
             className="rounded-lg border border-line px-3 py-1.5 text-[12px] font-medium text-ink-soft transition-colors hover:bg-ink/5 hover:text-ink"
           >
-            {cancelLabel}
+            {cancelLabel ?? t("common.cancel")}
           </button>
           <button
             type="button"
             onClick={onConfirm}
             className={`rounded-lg px-3 py-1.5 text-[12px] font-medium transition-opacity ${confirmClass}`}
           >
-            {confirmLabel}
+            {confirmLabel ?? t("common.confirm")}
           </button>
         </div>
       </div>

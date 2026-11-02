@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { AlertTriangle, Check, GitCommitHorizontal, Loader2 } from "lucide-react";
 
+import { useT } from "../../i18n";
 import { api } from "../../lib/ipc";
 import { statusMeta } from "../../lib/format";
 import type { HeadCommitPreview, WorktreeEntry } from "../../lib/types";
@@ -29,6 +30,7 @@ export default function CommitDialog({
   conflictedCount,
   onClose,
 }: CommitDialogProps) {
+  const t = useT();
   const project = useAppStore((state) => state.activeProject);
   const commitStaged = useAppStore((state) => state.commitStaged);
   const amendCommit = useAppStore((state) => state.amendCommit);
@@ -71,7 +73,7 @@ export default function CommitDialog({
       setBusy(false);
       if (!outcome.ok) return;
       if (outcome.needsForcePush) {
-        notify("info", "该提交已推送过，修正后需要强制推送");
+        notify("info", t("changes.amendPushedToast"));
       }
       onClose();
       return;
@@ -84,11 +86,19 @@ export default function CommitDialog({
   return (
     <Modal
       open
-      title={amend ? "修正上一次提交" : "提交已暂存的改动"}
+      title={amend ? t("changes.amendTitle") : t("changes.commitTitle")}
       subtitle={
         amend
-          ? `${branch ?? "当前分支"} · 替换最新提交${amendPreview ? ` ${amendPreview.shortSha}` : ""}`
-          : `${branch ?? "当前分支"} · ${staged.length} 个文件`
+          ? amendPreview
+            ? t("changes.amendSubtitleWithSha", {
+                branch: branch ?? t("changes.currentBranch"),
+                sha: amendPreview.shortSha,
+              })
+            : t("changes.amendSubtitle", { branch: branch ?? t("changes.currentBranch") })
+          : t("changes.commitSubtitle", {
+              branch: branch ?? t("changes.currentBranch"),
+              count: staged.length,
+            })
       }
       onClose={busy ? () => undefined : onClose}
       width={520}
@@ -100,7 +110,7 @@ export default function CommitDialog({
             disabled={busy}
             className="rounded-lg border border-line px-3 py-1.5 text-[12px] font-medium text-ink-soft transition-colors hover:bg-ink/5 hover:text-ink disabled:opacity-50"
           >
-            取消
+            {t("changes.cancel")}
           </button>
           <button
             type="button"
@@ -113,7 +123,7 @@ export default function CommitDialog({
             ) : (
               <GitCommitHorizontal size={12} />
             )}
-            {amend ? "修正提交" : "提交"}
+            {amend ? t("changes.amendSubmit") : t("changes.commitSubmit")}
           </button>
         </>
       }
@@ -133,11 +143,13 @@ export default function CommitDialog({
             >
               {amend ? <Check size={9} strokeWidth={3} /> : null}
             </span>
-            <span className="text-[11.5px] text-ink">修正上一次提交（amend）</span>
+            <span className="text-[11.5px] text-ink">{t("changes.amendToggle")}</span>
           </button>
           <span className="shrink-0 text-[10px] text-ink-faint">
             {amendPreview
-              ? `${amendPreview.filesChanged} 个文件${amendPreview.pushed ? " · 已推送" : ""}`
+              ? amendPreview.pushed
+                ? t("changes.amendFilesPushedPreview", { count: amendPreview.filesChanged })
+                : t("changes.amendFilesPreview", { count: amendPreview.filesChanged })
               : ""}
           </span>
         </div>
@@ -151,20 +163,22 @@ export default function CommitDialog({
         {amend && amendPreview?.pushed ? (
           <p className="flex items-start gap-1.5 rounded-lg border border-warning/35 bg-warning/8 px-2.5 py-1.5 text-[10.5px] leading-relaxed text-ink-soft">
             <AlertTriangle size={11} className="mt-0.5 shrink-0 text-warning" />
-            该提交已经推送过，修正后远程会拒绝普通推送，需要强制推送。
+            {t("changes.amendPushedWarning")}
           </p>
         ) : null}
 
         {conflictedCount > 0 ? (
           <p className="rounded-lg border border-negative/30 bg-negative/8 px-3 py-2 text-[11.5px] leading-relaxed text-negative">
-            还有 {conflictedCount} 个冲突文件未解决，需先解决冲突并暂存后才能提交。
+            {t("changes.conflictBlocking", { count: conflictedCount })}
           </p>
         ) : null}
 
         <div>
           <p className="mb-1 flex items-center justify-between text-[11.5px] font-medium text-ink-soft">
-            将提交的文件
-            <span className="font-normal text-[10.5px] text-ink-faint">{staged.length} 个</span>
+            {t("changes.filesToCommit")}
+            <span className="font-normal text-[10.5px] text-ink-faint">
+              {t("changes.fileCount", { count: staged.length })}
+            </span>
           </p>
           <div className="max-h-[148px] overflow-y-auto rounded-lg border border-line">
             {staged.map((entry) => {
@@ -201,8 +215,8 @@ export default function CommitDialog({
 
         <label className="block">
           <span className="mb-1 flex items-center gap-1 text-[11.5px] font-medium text-ink-soft">
-            提交信息
-            <HelpTip label="只提交暂存区（git commit，不带 -a），复用你的 hooks 与身份配置；为避免无终端时签名提示卡住，不启用 GPG 签名。⌘↵ 快速提交。" />
+            {t("changes.commitMessageLabel")}
+            <HelpTip label={t("changes.commitMessageHelp")} />
           </span>
           <textarea
             autoFocus
@@ -215,7 +229,7 @@ export default function CommitDialog({
               }
             }}
             rows={4}
-            placeholder={"feat: 简短说明这次改动\n\n可选：补充原因或影响范围"}
+            placeholder={t("changes.messagePlaceholder")}
             spellCheck={false}
             className="w-full resize-y rounded-lg border border-line bg-panel px-2.5 py-1.5 font-mono text-[11.5px] leading-relaxed text-ink outline-none transition-colors placeholder:text-ink-faint focus:border-accent/60"
           />

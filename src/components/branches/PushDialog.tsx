@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { AlertTriangle, Check, Loader2, RefreshCw, Upload } from "lucide-react";
 
+import { useT } from "../../i18n";
 import { api } from "../../lib/ipc";
 import type { BranchSummary, PushPreview } from "../../lib/types";
 import { useAppStore } from "../../store/appStore";
@@ -15,6 +16,7 @@ interface PushDialogProps {
 }
 
 export default function PushDialog({ branch, onClose }: PushDialogProps) {
+  const t = useT();
   const project = useAppStore((state) => state.activeProject);
   const pushBranch = useAppStore((state) => state.pushBranch);
   const syncBranch = useAppStore((state) => state.syncBranch);
@@ -69,7 +71,7 @@ export default function PushDialog({ branch, onClose }: PushDialogProps) {
       await load();
       return;
     }
-    setError(outcome.message ?? "推送失败");
+    setError(outcome.message ?? t("branches.pushFailed"));
   };
 
   const requiresForce = preview?.requiresForce ?? false;
@@ -79,8 +81,8 @@ export default function PushDialog({ branch, onClose }: PushDialogProps) {
   return (
     <Modal
       open
-      title="推送到远程"
-      subtitle={`${branch.name} → ${preview?.upstream ?? branch.upstream ?? "origin/同名分支"}`}
+      title={t("branches.pushTitle")}
+      subtitle={`${branch.name} → ${preview?.upstream ?? branch.upstream ?? t("branches.sameNameUpstream")}`}
       onClose={busy ? () => undefined : onClose}
       width={560}
       footer={
@@ -91,7 +93,7 @@ export default function PushDialog({ branch, onClose }: PushDialogProps) {
             disabled={busy !== null}
             className="mr-auto rounded-lg border border-line px-3 py-1.5 text-[12px] font-medium text-ink-soft transition-colors hover:bg-ink/5 hover:text-ink disabled:opacity-50"
           >
-            取消
+            {t("branches.cancel")}
           </button>
           <button
             type="button"
@@ -100,7 +102,7 @@ export default function PushDialog({ branch, onClose }: PushDialogProps) {
             className="inline-flex items-center gap-1.5 rounded-lg border border-negative/40 px-3 py-1.5 text-[12px] font-medium text-negative transition-colors hover:bg-negative/8 disabled:cursor-default disabled:opacity-40"
           >
             {busy === "force" ? <Loader2 size={12} className="animate-spin" /> : null}
-            强制推送
+            {t("branches.forcePush")}
           </button>
           <button
             type="button"
@@ -113,7 +115,9 @@ export default function PushDialog({ branch, onClose }: PushDialogProps) {
             ) : (
               <Upload size={12} />
             )}
-            {isNewRemoteBranch ? "推送并创建远程分支" : "推送"}
+            {isNewRemoteBranch
+              ? t("branches.pushCreateRemote")
+              : t("branches.pushAction")}
           </button>
         </>
       }
@@ -122,7 +126,7 @@ export default function PushDialog({ branch, onClose }: PushDialogProps) {
         {loading && !preview ? (
           <p className="flex items-center gap-2 py-4 text-[11.5px] text-ink-faint">
             <Loader2 size={13} className="animate-spin" />
-            正在比对本地与远程…
+            {t("branches.comparingLocalRemote")}
           </p>
         ) : null}
 
@@ -149,14 +153,15 @@ export default function PushDialog({ branch, onClose }: PushDialogProps) {
                   ) : (
                     <span className="text-ink-faint">—</span>
                   )}
-                  <HelpTip label="差异基于本地已同步的远程引用，需要最新状态时点「同步远程状态」。推送复用系统 SSH key / 凭据助手，应用不保存任何凭据。" />
+                  <HelpTip label={t("branches.pushHint")} />
                 </p>
                 <p className="mt-0.5 text-[10px] text-ink-faint">
-                  领先 <span className="text-positive">{preview.ahead}</span> · 落后{" "}
+                  {t("branches.aheadLabel")}{" "}
+                  <span className="text-positive">{preview.ahead}</span> · {t("branches.behindLabel")}{" "}
                   <span className={preview.behind > 0 ? "text-warning" : "text-ink-faint"}>
                     {preview.behind}
                   </span>
-                  {isNewRemoteBranch ? " · 远程还没有该分支" : ""}
+                  {isNewRemoteBranch ? t("branches.remoteBranchMissingSuffix") : ""}
                 </p>
               </div>
               <button
@@ -170,7 +175,7 @@ export default function PushDialog({ branch, onClose }: PushDialogProps) {
                 ) : (
                   <RefreshCw size={11} />
                 )}
-                同步远程状态
+                {t("branches.syncRemoteStatus")}
               </button>
             </div>
 
@@ -178,7 +183,7 @@ export default function PushDialog({ branch, onClose }: PushDialogProps) {
               <div className="rounded-lg border border-negative/30 bg-negative/8 px-3 py-2">
                 <p className="flex items-center gap-1 text-[11.5px] font-medium text-negative">
                   <AlertTriangle size={11.5} />
-                  远程拒绝了普通推送（non-fast-forward）
+                  {t("branches.pushRejected")}
                 </p>
                 <p className="mt-1 max-h-24 overflow-y-auto whitespace-pre-line break-words font-mono text-[10px] leading-relaxed text-ink-soft">
                   {rejected}
@@ -190,27 +195,35 @@ export default function PushDialog({ branch, onClose }: PushDialogProps) {
               <div className="rounded-lg border border-warning/35 bg-warning/8 px-3 py-2">
                 <p className="flex items-center gap-1 text-[11.5px] font-medium text-ink">
                   <AlertTriangle size={11.5} className="text-warning" />
-                  远程有 {preview.remoteOnlyTotal} 个本地没有的提交，普通推送会被拒绝
+                  {t("branches.pushRequiresForce", { count: preview.remoteOnlyTotal })}
                 </p>
                 <p className="mt-0.5 text-[10.5px] leading-relaxed text-ink-faint">
-                  强制推送会以本地历史覆盖这些远程提交（使用 <code className="font-mono">--force-with-lease</code>，他人新推的提交仍会阻止推送）。
+                  {t("branches.pushForcePrefix")}
+                  <code className="font-mono">--force-with-lease</code>
+                  {t("branches.pushForceSuffix")}
                 </p>
               </div>
             ) : null}
 
             <div>
               <p className="mb-1 flex items-center justify-between text-[11.5px] font-medium text-ink-soft">
-                将推送的提交
+                {t("branches.pushCommits")}
                 <span className="font-normal text-[10.5px] text-ink-faint">
-                  {preview.pushCommits.length}
-                  {preview.ahead > preview.pushCommits.length ? ` / 共 ${preview.ahead}` : ""} 个
+                  {preview.ahead > preview.pushCommits.length
+                    ? t("branches.commitCountOfTotal", {
+                        shown: preview.pushCommits.length,
+                        total: preview.ahead,
+                      })
+                    : t("branches.commitCount", { count: preview.pushCommits.length })}
                 </span>
               </p>
               <div className="overflow-hidden rounded-lg border border-line">
                 <CommitMiniList
                   commits={preview.pushCommits}
                   emptyLabel={
-                    isNewRemoteBranch ? "远程还没有该分支，将新建并推送" : "本地没有需要推送的提交"
+                    isNewRemoteBranch
+                      ? t("branches.pushNewRemoteEmpty")
+                      : t("branches.noPushCommits")
                   }
                   maxHeight={148}
                 />
@@ -220,15 +233,15 @@ export default function PushDialog({ branch, onClose }: PushDialogProps) {
             {preview.remoteOnlyCommits.length > 0 ? (
               <div>
                 <p className="mb-1 flex items-center justify-between text-[11.5px] font-medium text-ink-soft">
-                  远程独有提交（会被覆盖）
+                  {t("branches.remoteOnlyCommitsTitle")}
                   <span className="font-normal text-[10.5px] text-warning">
-                    {preview.remoteOnlyTotal} 个
+                    {t("branches.commitCount", { count: preview.remoteOnlyTotal })}
                   </span>
                 </p>
                 <div className="overflow-hidden rounded-lg border border-warning/35">
                   <CommitMiniList
                     commits={preview.remoteOnlyCommits}
-                    emptyLabel="远程没有独有提交"
+                    emptyLabel={t("branches.noRemoteOnlyCommits")}
                     maxHeight={124}
                   />
                 </div>
@@ -251,9 +264,9 @@ export default function PushDialog({ branch, onClose }: PushDialogProps) {
                   className="sr-only"
                 />
                 <span className="text-[11px] leading-relaxed text-ink-soft">
-                  我确认：强制推送会覆盖远程的{" "}
-                  <span className="font-semibold text-negative">{preview.remoteOnlyTotal}</span>{" "}
-                  个提交
+                  {t("branches.forceAckPrefix")}
+                  <span className="font-semibold text-negative">{preview.remoteOnlyTotal}</span>
+                  {t("branches.forceAckSuffix")}
                 </span>
               </label>
             ) : null}

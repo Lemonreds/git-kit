@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Check, Loader2, Search } from "lucide-react";
 
+import { useT } from "../../i18n";
 import { api } from "../../lib/ipc";
 import { relativeTime } from "../../lib/format";
 import type { BranchSummary, CommitSummary } from "../../lib/types";
@@ -15,6 +16,7 @@ interface CherryPickDialogProps {
 }
 
 export default function CherryPickDialog({ branch, onClose }: CherryPickDialogProps) {
+  const t = useT();
   const project = useAppStore((state) => state.activeProject);
   const branches = useAppStore((state) => state.branches);
   const cherryPick = useAppStore((state) => state.cherryPick);
@@ -92,8 +94,8 @@ export default function CherryPickDialog({ branch, onClose }: CherryPickDialogPr
   return (
     <Modal
       open
-      title="挑选提交到其他分支"
-      subtitle={`从 ${branch.name} 挑选提交，使用 cherry-pick 应用到目标分支`}
+      title={t("branches.cherryTitle")}
+      subtitle={t("branches.cherrySubtitle", { name: branch.name })}
       onClose={busy ? () => undefined : onClose}
       width={520}
       footer={
@@ -104,7 +106,7 @@ export default function CherryPickDialog({ branch, onClose }: CherryPickDialogPr
             disabled={busy}
             className="rounded-lg border border-line px-3 py-1.5 text-[12px] font-medium text-ink-soft transition-colors hover:bg-ink/5 hover:text-ink disabled:opacity-50"
           >
-            取消
+            {t("branches.cancel")}
           </button>
           <button
             type="button"
@@ -113,7 +115,7 @@ export default function CherryPickDialog({ branch, onClose }: CherryPickDialogPr
             className="inline-flex items-center gap-1.5 rounded-lg bg-accent px-3 py-1.5 text-[12px] font-medium text-white transition-opacity hover:opacity-90 disabled:cursor-default disabled:opacity-45"
           >
             {busy ? <Loader2 size={12} className="animate-spin" /> : null}
-            cherry-pick {selected.length} 个提交
+            {t("branches.cherrySubmit", { count: selected.length })}
           </button>
         </>
       }
@@ -127,19 +129,19 @@ export default function CherryPickDialog({ branch, onClose }: CherryPickDialogPr
 
         <div>
           <p className="mb-1 flex items-center justify-between text-[11.5px] font-medium text-ink-soft">
-            选择提交
+            {t("branches.pickCommits")}
             <span className="font-normal text-[10.5px] text-ink-faint">
-              已选 {selected.length} 个 · 默认最新一条
+              {t("branches.pickCommitsHint", { count: selected.length })}
             </span>
           </p>
           <div className="max-h-[196px] overflow-y-auto rounded-lg border border-line">
             {loading ? (
               <p className="flex items-center gap-2 px-3 py-3 text-[11.5px] text-ink-faint">
                 <Loader2 size={12} className="animate-spin" />
-                正在读取提交…
+                {t("branches.loadingCommits")}
               </p>
             ) : commits.length === 0 ? (
-              <p className="px-3 py-3 text-[11.5px] text-ink-faint">该分支还没有提交</p>
+              <p className="px-3 py-3 text-[11.5px] text-ink-faint">{t("branches.branchNoCommits")}</p>
             ) : (
               commits.map((commit) => {
                 const checked = selected.includes(commit.sha);
@@ -180,22 +182,24 @@ export default function CherryPickDialog({ branch, onClose }: CherryPickDialogPr
 
         <div>
           <p className="mb-1 flex items-center gap-1 text-[11.5px] font-medium text-ink-soft">
-            目标分支
-            <HelpTip label="执行时会切换到目标分支并停留在该分支；若冲突，仓库会停在 cherry-pick 状态，需要手动解决后 git cherry-pick --continue（或 --abort）。" />
-            <span className="ml-auto font-normal text-[10.5px] text-ink-faint">默认优先 test / 主分支</span>
+            {t("branches.targetBranch")}
+            <HelpTip label={t("branches.cherryHint")} />
+            <span className="ml-auto font-normal text-[10.5px] text-ink-faint">
+              {t("branches.cherryDefaultHint")}
+            </span>
           </p>
           <label className="flex items-center gap-1.5 rounded-lg border border-line bg-panel px-2 py-1.5 transition-colors focus-within:border-accent/60">
             <Search size={12} className="shrink-0 text-ink-faint" />
             <input
               value={query}
               onChange={(event) => setQuery(event.target.value)}
-              placeholder="搜索分支"
+              placeholder={t("branches.searchBranches")}
               className="w-full bg-transparent font-mono text-[11.5px] text-ink outline-none placeholder:text-ink-faint"
             />
           </label>
           <div className="mt-1 max-h-[104px] overflow-y-auto rounded-lg border border-line">
             {filteredTargets.length === 0 ? (
-              <p className="px-3 py-2 text-[11px] text-ink-faint">没有匹配的分支</p>
+              <p className="px-3 py-2 text-[11px] text-ink-faint">{t("branches.noMatchTitle")}</p>
             ) : (
               filteredTargets.map((item) => (
                 <button
@@ -213,7 +217,9 @@ export default function CherryPickDialog({ branch, onClose }: CherryPickDialogPr
                 >
                   <span className="min-w-0 flex-1 truncate">{item.name}</span>
                   {item.isHead ? (
-                    <span className="shrink-0 text-[9px] text-ink-faint">当前分支</span>
+                    <span className="shrink-0 text-[9px] text-ink-faint">
+                      {t("branches.currentBranch")}
+                    </span>
                   ) : null}
                   {target === item.name ? <Check size={11} className="shrink-0" /> : null}
                 </button>

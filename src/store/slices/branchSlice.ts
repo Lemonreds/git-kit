@@ -1,5 +1,6 @@
 import type { StateCreator } from "zustand";
 
+import { t } from "../../i18n";
 import { api } from "../../lib/ipc";
 import type { BranchSummary, RepoSnapshot } from "../../lib/types";
 import type { AppState } from "../appStore";
@@ -17,7 +18,7 @@ export interface BranchSlice {
   /** false = never requested yet (the panel loads the first page on open). */
   remoteLoaded: boolean;
   remoteTotal: number;
-  /** How many newest remote branches are shown; 「加载更多」grows it by REMOTE_PAGE. */
+  /** How many newest remote branches are shown; the load-more button grows it. */
   remoteLimit: number;
 
   refreshBranches: () => Promise<void>;
@@ -78,7 +79,7 @@ export const createBranchSlice: StateCreator<AppState, [], [], BranchSlice> = (s
         // Keep the remote section in sync once the user asked for it.
         if (get().remoteLoaded) await get().loadRemoteBranches();
       } catch (error) {
-        fail("刷新分支失败", error);
+        fail(t("store.refreshBranchesFailed"), error);
       }
     },
 
@@ -99,7 +100,7 @@ export const createBranchSlice: StateCreator<AppState, [], [], BranchSlice> = (s
       } catch (error) {
         if (epoch !== token.project) return;
         set({ remoteLoading: false });
-        fail("读取远程分支失败", error);
+        fail(t("store.loadRemoteBranchesFailed"), error);
       }
     },
 
@@ -122,7 +123,7 @@ export const createBranchSlice: StateCreator<AppState, [], [], BranchSlice> = (s
       } catch (error) {
         if (epoch !== token.project) return;
         set({ remoteLoading: false, remoteLimit: Math.max(get().remoteLimit - REMOTE_PAGE, REMOTE_PAGE) });
-        fail("加载更多远程分支失败", error);
+        fail(t("store.loadMoreRemoteBranchesFailed"), error);
       }
     },
 
@@ -171,7 +172,7 @@ export const createBranchSlice: StateCreator<AppState, [], [], BranchSlice> = (s
           remoteFailed: result.remoteFailed,
         };
       } catch (error) {
-        fail("删除分支失败", error);
+        fail(t("store.deleteBranchFailed"), error);
         await get().refreshBranches();
         return { ok: false };
       }
@@ -188,13 +189,13 @@ export const createBranchSlice: StateCreator<AppState, [], [], BranchSlice> = (s
           await get().refreshChanges();
           const created = get().branches.find((branch) => branch.refName === result.refName);
           if (created) await get().openBranch(created.refName);
-          notify("success", `已创建并切换到 ${result.branch}`);
+          notify("success", t("store.branchCreatedAndSwitched", { branch: result.branch }));
         } else {
-          notify("success", `已创建分支 ${result.branch}，当前分支未切换`);
+          notify("success", t("store.branchCreated", { branch: result.branch }));
         }
         return true;
       } catch (error) {
-        fail("新建分支失败", error);
+        fail(t("store.createBranchFailed"), error);
         await get().refreshBranches();
         return false;
       }
@@ -211,11 +212,13 @@ export const createBranchSlice: StateCreator<AppState, [], [], BranchSlice> = (s
         await get().refreshChanges();
         notify(
           "success",
-          result.switched ? `已切换到 ${result.branch}` : `${result.branch} 已经是当前分支`,
+          result.switched
+            ? t("store.branchSwitched", { branch: result.branch })
+            : t("store.branchAlreadyCurrent", { branch: result.branch }),
         );
         return true;
       } catch (error) {
-        fail("切换分支失败", error);
+        fail(t("store.switchBranchFailed"), error);
         await get().refreshBranches();
         await get().refreshChanges();
         return false;

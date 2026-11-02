@@ -1,11 +1,13 @@
 import { memo, useEffect, useMemo, useRef, useState } from "react";
 import type { RefObject } from "react";
-import { Binary, FileWarning } from "lucide-react";
+import { Binary, FileText, FileWarning } from "lucide-react";
 
+import { useT } from "../../i18n";
 import { parsePatch, toSplitRowItems, toUnifiedRows } from "../../lib/parsePatch";
 import type { FileDiff } from "../../lib/types";
 import type { DiffMode } from "../../store/appStore";
 import EmptyState from "../common/EmptyState";
+import FileContentModal from "./FileContentModal";
 import SplitDiff from "./SplitDiff";
 import UnifiedDiff from "./UnifiedDiff";
 
@@ -16,6 +18,8 @@ interface DiffViewerProps {
   query?: string;
   /** Scroll container around this viewer; used to load more rows while scrolling. */
   scrollerRef?: RefObject<HTMLDivElement | null>;
+  /** Commit SHA to fetch full file content. */
+  commitSha?: string;
 }
 
 // Auto-switch to unified mode for large files: the split view renders both
@@ -29,7 +33,8 @@ const LARGE_FILE_THRESHOLD = 1000;
  */
 const RENDER_STEP = 600;
 
-function DiffViewer({ diff, mode, query = "", scrollerRef }: DiffViewerProps) {
+function DiffViewer({ diff, mode, query = "", scrollerRef, commitSha }: DiffViewerProps) {
+  const t = useT();
   const parsed = useMemo(() => parsePatch(diff.patch), [diff.patch]);
 
   const totalLines = diff.additions + diff.deletions;
@@ -50,6 +55,7 @@ function DiffViewer({ diff, mode, query = "", scrollerRef }: DiffViewerProps) {
   const rowCount = unifiedRows?.length ?? splitRows?.length ?? 0;
 
   const [limit, setLimit] = useState(RENDER_STEP);
+  const [fileContentOpen, setFileContentOpen] = useState(false);
   useEffect(() => {
     setLimit(RENDER_STEP);
   }, [diff.patch, effectiveMode]);
@@ -82,8 +88,8 @@ function DiffViewer({ diff, mode, query = "", scrollerRef }: DiffViewerProps) {
     return (
       <EmptyState
         icon={Binary}
-        title="二进制文件"
-        description="该文件无法按行展示差异，请在本地工具中查看。"
+        title={t("diff.binaryTitle")}
+        description={t("diff.binaryDescription")}
       />
     );
   }
@@ -104,6 +110,17 @@ function DiffViewer({ diff, mode, query = "", scrollerRef }: DiffViewerProps) {
             <span className="text-ink">{diff.path}</span>
           )}
         </span>
+        {commitSha ? (
+          <button
+            type="button"
+            onClick={() => setFileContentOpen(true)}
+            className="flex shrink-0 items-center gap-1.5 rounded-md border border-line px-2 py-1 text-[11px] text-ink-soft transition-colors hover:border-accent/40 hover:text-accent"
+            title={t("diff.viewFullFileTooltip")}
+          >
+            <FileText size={12} />
+            <span>{t("diff.viewFullFile")}</span>
+          </button>
+        ) : null}
         <span className="shrink-0 font-mono text-[10px]">
           <span className="text-positive">+{diff.additions}</span>
           <span className="px-1 text-ink-faint">/</span>
@@ -114,14 +131,14 @@ function DiffViewer({ diff, mode, query = "", scrollerRef }: DiffViewerProps) {
       {diff.truncated ? (
         <div className="flex items-center gap-2 border-b border-line bg-warning/10 px-3 py-1.5 text-[11px] text-warning">
           <FileWarning size={12} className="shrink-0" />
-          文件较大，仅展示部分改动内容。
+          {t("diff.truncatedNotice")}
         </div>
       ) : null}
 
       {isLargeFile && mode === "split" ? (
         <div className="flex items-center gap-2 border-b border-line bg-accent/10 px-3 py-1.5 text-[11px] text-accent">
           <FileWarning size={12} className="shrink-0" />
-          文件改动超过 {LARGE_FILE_THRESHOLD} 行，已自动切换为 unified 模式以优化性能。
+          {t("diff.largeFileNotice", { threshold: LARGE_FILE_THRESHOLD })}
         </div>
       ) : null}
 
@@ -136,15 +153,24 @@ function DiffViewer({ diff, mode, query = "", scrollerRef }: DiffViewerProps) {
           ref={sentinelRef}
           className="flex items-center justify-center gap-2 border-t border-line/60 px-3 py-2 text-[10.5px] text-ink-faint"
         >
-          已显示 {visible} / {rowCount} 行 · 继续向下滚动会自动加载
+          {t("diff.rowsShown", { visible, total: rowCount })}
           <button
             type="button"
             onClick={() => setLimit(rowCount)}
             className="rounded-md border border-line px-1.5 py-0.5 text-[10.5px] text-ink-soft transition-colors hover:border-accent/40 hover:text-accent"
           >
-            全部显示
+            {t("diff.showAllRows")}
           </button>
         </div>
+      ) : null}
+
+      {commitSha ? (
+        <FileContentModal
+          open={fileContentOpen}
+          sha={commitSha}
+          path={diff.path}
+          onClose={() => setFileContentOpen(false)}
+        />
       ) : null}
     </div>
   );

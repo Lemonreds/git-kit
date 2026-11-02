@@ -1,9 +1,11 @@
 import { AlertCircle, CheckCircle2, Info, X } from "lucide-react";
 import { createPortal } from "react-dom";
 
+import { useT } from "../../i18n";
 import { useAppStore } from "../../store/appStore";
 
 export default function Toast() {
+  const t = useT();
   const toast = useAppStore((state) => state.toast);
   const dismiss = useAppStore((state) => state.dismissToast);
 
@@ -27,7 +29,7 @@ export default function Toast() {
         <button
           type="button"
           onClick={dismiss}
-          aria-label="关闭提示"
+          aria-label={t("common.dismissToast")}
           className="-mr-1 mt-px grid h-5 w-5 shrink-0 place-items-center rounded text-ink-faint transition-colors hover:bg-ink/8 hover:text-ink"
         >
           <X size={12} />

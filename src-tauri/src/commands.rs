@@ -335,6 +335,16 @@ pub fn get_file_diff(
 }
 
 #[tauri::command(async)]
+pub fn get_file_content(
+    repo_path: String,
+    sha: String,
+    path: String,
+) -> Result<String, AppError> {
+    let repo = git_repo::open_repo(&repo_path)?;
+    diff::get_file_content(&repo, &sha, &path)
+}
+
+#[tauri::command(async)]
 pub fn get_worktree_status(repo_path: String) -> Result<WorktreeStatus, AppError> {
     let repo = git_repo::open_repo(&repo_path)?;
     status::worktree_status(&repo)

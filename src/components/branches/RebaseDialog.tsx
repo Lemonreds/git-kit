@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { AlertTriangle, Check, GitBranch, Loader2, RefreshCw, Upload } from "lucide-react";
 
+import { useT } from "../../i18n";
 import { api } from "../../lib/ipc";
 import type { BranchSummary, RebasePreview, RebaseResult } from "../../lib/types";
 import { useAppStore } from "../../store/appStore";
@@ -33,6 +34,7 @@ function pickDefaultBase(branches: BranchSummary[], self: string): string {
 }
 
 export default function RebaseDialog({ branch, onClose }: RebaseDialogProps) {
+  const t = useT();
   const project = useAppStore((state) => state.activeProject);
   const branches = useAppStore((state) => state.branches);
   const remoteBranches = useAppStore((state) => state.remoteBranches);
@@ -104,7 +106,7 @@ export default function RebaseDialog({ branch, onClose }: RebaseDialogProps) {
       setConflict(outcome.message ?? null);
       return;
     }
-    setError(outcome.message ?? "rebase 失败");
+    setError(outcome.message ?? t("branches.rebaseFailed"));
   };
 
   const blocked = !baseRef || loading || Boolean(preview?.alreadyBased) || Boolean(preview?.dirty);
@@ -116,8 +118,8 @@ export default function RebaseDialog({ branch, onClose }: RebaseDialogProps) {
   return (
     <Modal
       open
-      title="Rebase 到基线"
-      subtitle={`${branch.name} ← ${preview?.base ?? (baseRef || "选择基线")}`}
+      title={t("branches.actionRebase")}
+      subtitle={`${branch.name} ← ${preview?.base ?? (baseRef || t("branches.selectBase"))}`}
       onClose={busy ? () => undefined : onClose}
       width={560}
       footer={
@@ -128,7 +130,7 @@ export default function RebaseDialog({ branch, onClose }: RebaseDialogProps) {
               onClick={onClose}
               className="rounded-lg border border-line px-3 py-1.5 text-[12px] font-medium text-ink-soft transition-colors hover:bg-ink/5 hover:text-ink"
             >
-              完成
+              {t("branches.done")}
             </button>
             {result.needsForcePush ? (
               <button
@@ -137,7 +139,7 @@ export default function RebaseDialog({ branch, onClose }: RebaseDialogProps) {
                 className="inline-flex items-center gap-1.5 rounded-lg border border-negative/40 px-3 py-1.5 text-[12px] font-medium text-negative transition-colors hover:bg-negative/8"
               >
                 <Upload size={12} />
-                强制推送
+                {t("branches.forcePush")}
               </button>
             ) : null}
           </>
@@ -149,7 +151,7 @@ export default function RebaseDialog({ branch, onClose }: RebaseDialogProps) {
               disabled={busy !== null}
               className="rounded-lg border border-line px-3 py-1.5 text-[12px] font-medium text-ink-soft transition-colors hover:bg-ink/5 hover:text-ink disabled:opacity-50"
             >
-              取消
+              {t("branches.cancel")}
             </button>
             <button
               type="button"
@@ -162,7 +164,7 @@ export default function RebaseDialog({ branch, onClose }: RebaseDialogProps) {
               ) : (
                 <GitBranch size={12} />
               )}
-              开始 rebase
+              {t("branches.startRebase")}
             </button>
           </>
         )
@@ -172,16 +174,17 @@ export default function RebaseDialog({ branch, onClose }: RebaseDialogProps) {
         <div className="space-y-3">
           <p className="flex items-center gap-1.5 rounded-lg border border-positive/30 bg-positive/8 px-3 py-2 text-[11.5px] text-positive">
             <Check size={12} />
-            已把 {result.replayed} 个提交 rebase 到 {result.base}
+            {t("branches.rebaseDone", { count: result.replayed, base: result.base })}
           </p>
           {result.needsForcePush ? (
             <p className="rounded-lg border border-warning/35 bg-warning/8 px-3 py-2 text-[10.5px] leading-relaxed text-ink-soft">
-              该分支的旧提交已经推送过，rebase 改写了历史，远程会拒绝普通推送。点「强制推送」使用{" "}
-              <code className="font-mono">--force-with-lease</code> 覆盖远程；若他人刚推过新提交仍会被拒绝。
+              {t("branches.rebaseForcePrefix")}
+              <code className="font-mono">--force-with-lease</code>
+              {t("branches.rebaseForceSuffix")}
             </p>
           ) : (
             <p className="text-[10.5px] leading-relaxed text-ink-faint">
-              历史已重写但尚未推送过该分支，按正常推送即可。
+              {t("branches.rebaseNotPushed")}
             </p>
           )}
         </div>
@@ -193,17 +196,20 @@ export default function RebaseDialog({ branch, onClose }: RebaseDialogProps) {
                 <span className="break-all text-ink">{branch.name}</span>
                 <span className="text-ink-faint">←</span>
                 <span className="min-w-0 break-all">
-                  {preview?.base ?? (baseRef || "未选择基线")}
+                  {preview?.base ?? (baseRef || t("branches.noBaseSelected"))}
                 </span>
-                <HelpTip label="rebase 会先同步基线（远程基线会 fetch），再把本分支的提交逐个重放到基线上；冲突时仓库停在 rebase 状态，需手动解决后 git rebase --continue。" />
+                <HelpTip label={t("branches.rebaseHint")} />
               </p>
               <p className="mt-0.5 text-[10px] text-ink-faint">
                 {loading
-                  ? "正在比对…"
+                  ? t("branches.comparing")
                   : preview
-                    ? `将重放 ${preview.count} 个提交 · 基线领先 ${preview.behindBase} 个`
+                    ? t("branches.rebasePreview", {
+                        count: preview.count,
+                        behind: preview.behindBase,
+                      })
                     : "—"}
-                {preview?.pushedTip ? " · 旧提交已推送" : ""}
+                {preview?.pushedTip ? t("branches.oldCommitsPushedSuffix") : ""}
               </p>
             </div>
             <button
@@ -217,21 +223,23 @@ export default function RebaseDialog({ branch, onClose }: RebaseDialogProps) {
               ) : (
                 <RefreshCw size={11} />
               )}
-              同步远程
+              {t("branches.syncRemote")}
             </button>
           </div>
 
           <div>
             <p className="mb-1 flex items-center justify-between text-[11.5px] font-medium text-ink-soft">
-              基线分支
-              <span className="font-normal text-[10.5px] text-ink-faint">默认主分支</span>
+              {t("branches.baseBranchLabel")}
+              <span className="font-normal text-[10.5px] text-ink-faint">
+                {t("branches.defaultMainHint")}
+              </span>
             </p>
             <BaseBranchPicker
               branches={allBranches}
               value={baseRef}
               onChange={setBaseRef}
               excludeRefName={branch.refName}
-              placeholder={preview?.base ?? "搜索分支"}
+              placeholder={preview?.base ?? t("branches.searchBranches")}
               maxHeight={132}
             />
           </div>
@@ -239,33 +247,41 @@ export default function RebaseDialog({ branch, onClose }: RebaseDialogProps) {
           {preview && preview.count > 0 ? (
             <div>
               <p className="mb-1 flex items-center justify-between text-[11.5px] font-medium text-ink-soft">
-                将被重放的提交
+                {t("branches.toBeReplayed")}
                 <span className="font-normal text-[10.5px] text-ink-faint">
-                  {preview.commits.length}
-                  {preview.count > preview.commits.length ? ` / 共 ${preview.count}` : ""} 个
+                  {preview.count > preview.commits.length
+                    ? t("branches.commitCountOfTotal", {
+                        shown: preview.commits.length,
+                        total: preview.count,
+                      })
+                    : t("branches.commitCount", { count: preview.commits.length })}
                 </span>
               </p>
               <div className="overflow-hidden rounded-lg border border-line">
-                <CommitMiniList commits={preview.commits} emptyLabel="没有需要重放的提交" maxHeight={168} />
+                <CommitMiniList
+                  commits={preview.commits}
+                  emptyLabel={t("branches.noReplayCommits")}
+                  maxHeight={168}
+                />
               </div>
             </div>
           ) : null}
 
           {preview?.alreadyBased ? (
             <p className="rounded-lg border border-line bg-canvas/50 px-3 py-2 text-[10.5px] text-ink-soft">
-              该分支已经包含基线的全部提交，无需 rebase。
+              {t("branches.alreadyBased")}
             </p>
           ) : null}
 
           {preview?.dirty ? (
             <p className="rounded-lg border border-warning/35 bg-warning/8 px-3 py-2 text-[10.5px] leading-relaxed text-ink-soft">
-              工作区有未提交改动，rebase 前需要先提交或暂存。
+              {t("branches.dirtyRebase")}
             </p>
           ) : null}
 
           {!branch.isHead ? (
             <p className="text-[10.5px] text-ink-faint">
-              rebase 会先切换到 {branch.name}，完成后停留在该分支。
+              {t("branches.rebaseSwitchFirst", { name: branch.name })}
             </p>
           ) : null}
 
@@ -273,7 +289,7 @@ export default function RebaseDialog({ branch, onClose }: RebaseDialogProps) {
             <div className="rounded-lg border border-negative/35 bg-negative/8 px-3 py-2">
               <p className="flex items-center gap-1 text-[11.5px] font-medium text-negative">
                 <AlertTriangle size={11.5} />
-                rebase 时出现冲突，仓库停留在 rebase 状态
+                {t("branches.rebaseConflict")}
               </p>
               <p className="mt-1 max-h-32 overflow-y-auto whitespace-pre-line break-words font-mono text-[10px] leading-relaxed text-ink-soft">
                 {conflict}

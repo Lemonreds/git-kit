@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { Check, Cloud, GitBranch, Search } from "lucide-react";
 
+import { useT } from "../../i18n";
 import type { BranchSummary } from "../../lib/types";
 
 interface BaseBranchPickerProps {
@@ -16,7 +17,7 @@ interface BaseBranchPickerProps {
   maxHeight?: number;
 }
 
-/** Searchable branch list used by 新建分支 and rebase 的基线选择。 */
+/** Searchable branch list used by the new-branch and rebase base pickers. */
 export default function BaseBranchPicker({
   branches,
   value,
@@ -25,6 +26,7 @@ export default function BaseBranchPicker({
   placeholder,
   maxHeight = 140,
 }: BaseBranchPickerProps) {
+  const t = useT();
   const [query, setQuery] = useState("");
 
   const filtered = useMemo(() => {
@@ -60,7 +62,7 @@ export default function BaseBranchPicker({
       </label>
       <div className="overflow-y-auto" style={{ maxHeight }}>
         {filtered.local.length === 0 && filtered.remote.length === 0 ? (
-          <p className="px-3 py-2 text-[11px] text-ink-faint">没有匹配的分支</p>
+          <p className="px-3 py-2 text-[11px] text-ink-faint">{t("branches.noMatchTitle")}</p>
         ) : null}
 
         {filtered.local.map((branch) => (
@@ -74,7 +76,7 @@ export default function BaseBranchPicker({
 
         {filtered.remote.length > 0 ? (
           <p className="border-y border-line bg-canvas/50 px-2 py-1 text-[9.5px] font-semibold uppercase tracking-[0.08em] text-ink-faint">
-            远程分支（已加载）
+            {t("branches.remoteLoadedHeader")}
           </p>
         ) : null}
         {filtered.remote.map((branch) => (
@@ -99,6 +101,7 @@ function BaseRow({
   active: boolean;
   onSelect: () => void;
 }) {
+  const t = useT();
   return (
     <button
       type="button"
@@ -113,7 +116,9 @@ function BaseRow({
         <GitBranch size={11} className="shrink-0 text-ink-faint" />
       )}
       <span className="min-w-0 flex-1 truncate">{branch.name}</span>
-      {branch.isHead ? <span className="shrink-0 text-[9px] text-ink-faint">当前分支</span> : null}
+      {branch.isHead ? (
+        <span className="shrink-0 text-[9px] text-ink-faint">{t("branches.currentBranch")}</span>
+      ) : null}
       {active ? <Check size={11} className="shrink-0" /> : null}
     </button>
   );

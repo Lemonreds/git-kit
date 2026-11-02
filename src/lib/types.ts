@@ -423,3 +423,11 @@ export interface AppError {
   code: string;
   message: string;
 }
+
+/** Handle returned by `terminal_open`; everything else about the pty stays in Rust. */
+export interface TerminalSessionInfo {
+  id: string;
+  projectId: string;
+  cwd: string;
+  shell: string;
+}

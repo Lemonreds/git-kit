@@ -1,4 +1,6 @@
-import { invoke } from "@tauri-apps/api/core";
+import { Channel, invoke } from "@tauri-apps/api/core";
+
+import { t } from "../i18n";
 
 import type {
   AppError,
@@ -41,6 +43,7 @@ import type {
   StashList,
   SyncResult,
   TagInfo,
+  TerminalSessionInfo,
   WorktreeStatus,
 } from "./types";
 
@@ -64,7 +67,7 @@ function normalizeError(raw: unknown): IpcError {
   if (typeof raw === "string") {
     return new IpcError("unknown", raw);
   }
-  return new IpcError("unknown", "操作失败，请重试");
+  return new IpcError("unknown", t("store.unknownError"));
 }
 
 /**
@@ -77,6 +80,15 @@ async function call<T>(command: string, args?: Record<string, unknown>): Promise
   } catch (raw) {
     throw normalizeError(raw);
   }
+}
+
+/** One message of the terminal channel: output bytes or an exit control frame. */
+type TerminalMessage = ArrayBuffer | { kind: "exit"; code: number | null };
+
+/** How the terminal view receives its stream. */
+export interface TerminalStream {
+  onData: (bytes: Uint8Array) => void;
+  onExit: (code: number | null) => void;
 }
 
 export const api = {
@@ -224,4 +236,44 @@ export const api = {
       oldPath: oldPath ?? null,
       contextLines: 3,
     }),
+
+  getFileContent: (repoPath: string, sha: string, path: string) =>
+    call<string>("get_file_content", { repoPath, sha, path }),
+
+  // --- terminal ---
+  terminalOpen: (
+    path: string,
+    cols: number,
+    rows: number,
+    stream: TerminalStream,
+    shell?: string | null,
+  ) => {
+    // Raw bytes for the terminal output, a tagged object for the control frames:
+    // the channel delivers `ArrayBuffer` for the former, which is ~4x cheaper
+    // than the JSON number array a `Vec<u8>` would serialise into.
+    const channel = new Channel<TerminalMessage>();
+    channel.onmessage = (message) => {
+      if (message instanceof ArrayBuffer) {
+        stream.onData(new Uint8Array(message));
+        return;
+      }
+      if (message && typeof message === "object" && message.kind === "exit") {
+        stream.onExit(message.code ?? null);
+      }
+    };
+    return call<TerminalSessionInfo>("terminal_open", {
+      path,
+      cols,
+      rows,
+      shell: shell ?? null,
+      onEvent: channel,
+    });
+  },
+  terminalWrite: (id: string, data: string) =>
+    call<void>("terminal_write", { id, data }),
+  terminalResize: (id: string, cols: number, rows: number) =>
+    call<void>("terminal_resize", { id, cols, rows }),
+  terminalPause: (id: string) => call<void>("terminal_pause", { id }),
+  terminalResume: (id: string) => call<void>("terminal_resume", { id }),
+  terminalClose: (id: string) => call<void>("terminal_close", { id }),
 };

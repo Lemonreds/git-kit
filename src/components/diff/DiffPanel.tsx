@@ -16,6 +16,7 @@ import {
   Undo2,
 } from "lucide-react";
 
+import { useT } from "../../i18n";
 import { api } from "../../lib/ipc";
 import type { CommitDetail } from "../../lib/types";
 import TagDialog from "../branches/TagDialog";
@@ -34,6 +35,7 @@ import DiffViewer from "./DiffViewer";
 import FileChangeList from "./FileChangeList";
 
 export default function DiffPanel() {
+  const t = useT();
   const {
     activeProject,
     commits,
@@ -80,19 +82,19 @@ export default function DiffPanel() {
   const copySha = async () => {
     if (!selectedCommitSha) return;
     const ok = await copyText(selectedCommitSha);
-    notify(ok ? "success" : "error", ok ? "已复制完整提交 SHA" : "复制失败");
+    notify(ok ? "success" : "error", ok ? t("diff.copyShaSuccess") : t("diff.copyFailure"));
   };
 
   const copyPatch = async () => {
     if (!diff?.patch) return;
     const ok = await copyText(diff.patch);
-    notify(ok ? "success" : "error", ok ? "已复制该文件的改动" : "复制失败");
+    notify(ok ? "success" : "error", ok ? t("diff.copyPatchSuccess") : t("diff.copyFailure"));
   };
 
   const modeToggle = (
     <div className="ml-0.5 flex items-center gap-0.5 rounded-md border border-line bg-canvas/60 p-0.5">
       <IconButton
-        label="统一视图"
+        label={t("diff.unifiedView")}
         size="sm"
         active={diffMode === "unified"}
         onClick={() => setDiffMode("unified")}
@@ -100,7 +102,7 @@ export default function DiffPanel() {
         <Rows3 size={12} />
       </IconButton>
       <IconButton
-        label="分栏视图"
+        label={t("diff.splitView")}
         size="sm"
         active={diffMode === "split"}
         onClick={() => setDiffMode("split")}
@@ -196,7 +198,7 @@ export default function DiffPanel() {
 
   const searchToggle = (
     <IconButton
-      label="在改动中查找"
+      label={t("diff.findInDiff")}
       shortcut="⌘F"
       active={searchOpen}
       onClick={() => (searchOpen ? closeSearch() : setSearchOpen(true))}
@@ -233,7 +235,7 @@ export default function DiffPanel() {
                 : "bg-warning/14 text-warning"
             }`}
           >
-            {worktreeTarget.staged ? "已暂存" : "未暂存"}
+            {worktreeTarget.staged ? t("diff.staged") : t("diff.unstaged")}
           </span>
           <span className="min-w-0 flex-1 truncate font-mono text-[11px] text-ink-soft">
             {worktreeTarget.path}
@@ -247,7 +249,7 @@ export default function DiffPanel() {
 
           <div className="no-drag ml-1 flex shrink-0 items-center gap-0.5">
             <IconButton
-              label="刷新此文件的改动"
+              label={t("diff.refreshThisFile")}
               onClick={() => void refreshWorktreeDiff()}
               disabled={diffLoading}
             >
@@ -255,25 +257,25 @@ export default function DiffPanel() {
             </IconButton>
             {worktreeTarget.staged ? (
               <IconButton
-                label="取消暂存此文件"
+                label={t("diff.unstageThisFile")}
                 onClick={() => void unstageFile(worktreeTarget.path)}
               >
                 <Undo2 size={13} />
               </IconButton>
             ) : (
-              <IconButton label="暂存此文件" onClick={() => void stageFile(worktreeTarget.path)}>
+              <IconButton label={t("diff.stageThisFile")} onClick={() => void stageFile(worktreeTarget.path)}>
                 <Plus size={13} />
               </IconButton>
             )}
             <IconButton
-              label="放弃此文件的改动"
+              label={t("diff.discardFileChanges")}
               tone="danger"
               onClick={() => setConfirmDiscard(true)}
             >
               <Trash2 size={13} />
             </IconButton>
             {diff?.patch ? (
-              <IconButton label="复制该文件改动" onClick={() => void copyPatch()}>
+              <IconButton label={t("diff.copyThisFilePatch")} onClick={() => void copyPatch()}>
                 <ClipboardCopy size={13} />
               </IconButton>
             ) : null}
@@ -287,15 +289,15 @@ export default function DiffPanel() {
             {diffLoading ? (
               <div className="flex h-full items-center justify-center gap-2 text-[11.5px] text-ink-faint">
                 <Loader2 size={14} className="animate-spin" />
-                正在读取改动…
+                {t("diff.loadingDiff")}
               </div>
             ) : diff ? (
-              <DiffViewer diff={diff} mode={diffMode} query={searchQuery} scrollerRef={scrollRef} />
+              <DiffViewer diff={diff} mode={diffMode} query={searchQuery} scrollerRef={scrollRef} commitSha={selectedCommitSha ?? undefined} />
             ) : (
               <EmptyState
                 icon={FileDiffIcon}
-                title="没有可显示的差异"
-                description="该文件可能已被还原，或改动只涉及文件模式。"
+                title={t("diff.emptyDiffTitle")}
+                description={t("diff.emptyDiffDescription")}
               />
             )}
           </div>
@@ -304,9 +306,9 @@ export default function DiffPanel() {
 
         <ConfirmDialog
           open={confirmDiscard}
-          title="放弃该文件的改动"
-          description={`将丢弃「${worktreeTarget.path}」的未提交修改，该操作不可撤销。`}
-          confirmLabel="放弃改动"
+          title={t("diff.discardConfirmTitle")}
+          description={t("diff.discardConfirmDescription", { path: worktreeTarget.path })}
+          confirmLabel={t("diff.discardConfirm")}
           tone="danger"
           onConfirm={() => {
             void discardFile(worktreeTarget.path);
@@ -335,7 +337,7 @@ export default function DiffPanel() {
               {commit.summary}
             </span>
             <span className="shrink-0 font-mono text-[10px] text-ink-faint">
-              {formatCount(files.length)} 个文件
+              {t("diff.fileCount", { count: formatCount(files.length) })}
               <span className="ml-1.5 text-positive">+{stats.additions}</span>
               <span className="ml-1 text-negative">−{stats.deletions}</span>
             </span>
@@ -343,30 +345,30 @@ export default function DiffPanel() {
         ) : (
           <>
             <FileDiffIcon size={13} className="text-ink-faint" />
-            <span className="flex-1 text-[11.5px] font-medium text-ink-soft">改动对比</span>
+            <span className="flex-1 text-[11.5px] font-medium text-ink-soft">{t("diff.comparison")}</span>
           </>
         )}
 
         <div className="no-drag ml-1 flex shrink-0 items-center gap-0.5">
           <IconButton
-            label="刷新改动文件列表"
+            label={t("diff.refreshFileList")}
             onClick={() => void refreshCommitFiles()}
             disabled={filesLoading || !selectedCommitSha}
           >
             <RefreshCw size={13} className={filesLoading ? "animate-spin" : undefined} />
           </IconButton>
           {diff?.patch ? (
-            <IconButton label="复制该文件改动" onClick={() => void copyPatch()}>
+            <IconButton label={t("diff.copyThisFilePatch")} onClick={() => void copyPatch()}>
               <ClipboardCopy size={13} />
             </IconButton>
           ) : null}
           {selectedCommitSha ? (
             <>
-              <IconButton label="复制提交 SHA" onClick={() => void copySha()}>
+              <IconButton label={t("diff.copyCommitSha")} onClick={() => void copySha()}>
                 <Copy size={13} />
               </IconButton>
               <IconButton
-                label="提交详情"
+                label={t("diff.commitDetails")}
                 active={detailOpen}
                 onClick={() => setDetailOpen((open) => !open)}
               >
@@ -391,7 +393,7 @@ export default function DiffPanel() {
             <span {...tip(timeTooltip(detail.committedAt))}>{absoluteTime(detail.committedAt)}</span>
             <span>·</span>
             <span className="font-mono">
-              +{detail.additions} / −{detail.deletions} · {detail.filesChanged} 个文件
+              +{detail.additions} / −{detail.deletions} · {t("diff.fileCount", { count: detail.filesChanged })}
             </span>
             {detail.isMerge ? (
               <span className="rounded border border-line px-1 py-px">merge</span>
@@ -399,7 +401,7 @@ export default function DiffPanel() {
           </p>
           {detail.parents.length > 0 ? (
             <p className="mt-1 flex flex-wrap items-center gap-1 text-[10px] text-ink-faint">
-              父提交
+              {t("diff.parents")}
               {detail.parents.map((sha) => (
                 <ShaChip key={sha} sha={sha} plain className="text-[10px]" />
               ))}
@@ -412,7 +414,7 @@ export default function DiffPanel() {
               className="inline-flex items-center gap-1 rounded-md border border-line px-1.5 py-0.5 text-[10.5px] text-ink-soft transition-colors hover:border-accent/40 hover:text-accent"
             >
               <Tag size={10} />
-              打标签
+              {t("diff.addTag")}
             </button>
             <button
               type="button"
@@ -420,21 +422,21 @@ export default function DiffPanel() {
               className="inline-flex items-center gap-1 rounded-md border border-negative/35 px-1.5 py-0.5 text-[10.5px] text-negative transition-colors hover:bg-negative/8"
             >
               <Undo2 size={10} />
-              撤销此提交
+              {t("diff.revertThisCommit")}
             </button>
           </div>
         </div>
       ) : null}
 
       {!selectedCommitSha ? (
-        <EmptyState icon={FileDiffIcon} title="选择一个提交" />
+        <EmptyState icon={FileDiffIcon} title={t("diff.selectCommit")} />
       ) : (
         <div className="flex min-h-0 flex-1 flex-col">
           <div className="max-h-[38%] shrink-0 overflow-y-auto border-b border-line bg-canvas/40">
             {filesLoading ? (
               <SkeletonRows rows={4} />
             ) : files.length === 0 ? (
-              <p className="px-3 py-4 text-[11.5px] text-ink-faint">该提交没有文件改动。</p>
+              <p className="px-3 py-4 text-[11.5px] text-ink-faint">{t("diff.noFileChanges")}</p>
             ) : (
               <FileChangeList
                 files={files}
@@ -449,15 +451,15 @@ export default function DiffPanel() {
               {diffLoading ? (
                 <div className="flex h-full items-center justify-center gap-2 text-[11.5px] text-ink-faint">
                   <Loader2 size={14} className="animate-spin" />
-                  正在读取改动…
+                  {t("diff.loadingDiff")}
                 </div>
               ) : diff ? (
                 <DiffViewer diff={diff} mode={diffMode} query={searchQuery} scrollerRef={scrollRef} />
               ) : (
                 <EmptyState
                   icon={FileDiffIcon}
-                  title="选择文件查看改动"
-                  description="在文件列表中选择文件即可查看逐行差异。"
+                  title={t("diff.selectFileTitle")}
+                  description={t("diff.selectFileDescription")}
                 />
               )}
             </div>
@@ -472,16 +474,16 @@ export default function DiffPanel() {
 
       <ConfirmDialog
         open={confirmRevert}
-        title="撤销这个提交？"
-        description="会生成一个反向提交（git revert），不会改写历史，适合已推送的提交。"
-        confirmLabel="撤销提交"
+        title={t("diff.revertConfirmTitle")}
+        description={t("diff.revertConfirmDescription")}
+        confirmLabel={t("diff.revertConfirm")}
         tone="danger"
         onConfirm={() => {
           setConfirmRevert(false);
           if (!selectedCommitSha) return;
           void revertCommit(selectedCommitSha).then((outcome) => {
             if (!outcome.ok && outcome.message) {
-              showAlert("撤销提交失败", outcome.message);
+              showAlert(t("diff.revertFailed"), outcome.message);
             }
           });
         }}

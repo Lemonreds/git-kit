@@ -1,26 +1,31 @@
 import { useEffect, useRef, useState } from "react";
 import { AlertTriangle, Check, Loader2, UserRound } from "lucide-react";
 
+import { useT } from "../../i18n";
+import type { MessageKey } from "../../i18n";
 import type { ConfigSource } from "../../lib/types";
 import { useAppStore } from "../../store/appStore";
 import HelpTip from "../common/HelpTip";
 import { tip } from "../common/Tooltip";
 
-const SOURCE_META: Record<ConfigSource, { label: string; className: string; hint: string }> = {
+const SOURCE_META: Record<
+  ConfigSource,
+  { label: MessageKey; className: string; hint: MessageKey }
+> = {
   local: {
-    label: "本地",
+    label: "settings.identity.source.local",
     className: "border-accent/40 bg-accent-soft text-accent",
-    hint: "来自当前仓库的 .git/config",
+    hint: "settings.identity.source.localHint",
   },
   global: {
-    label: "全局",
+    label: "settings.identity.source.global",
     className: "border-line bg-canvas text-ink-faint",
-    hint: "本地未设置，当前生效值来自全局配置；保存后会写入本仓库 .git/config",
+    hint: "settings.identity.source.globalHint",
   },
   none: {
-    label: "未设置",
+    label: "settings.identity.source.none",
     className: "border-warning/40 bg-warning/8 text-warning",
-    hint: "本地与全局都没有配置，提交会被 git 拒绝",
+    hint: "settings.identity.source.noneHint",
   },
 };
 
@@ -28,6 +33,7 @@ const inputClass =
   "w-full rounded-lg border border-line bg-panel px-2.5 py-1.5 text-[12px] text-ink outline-none transition-colors placeholder:text-ink-faint focus:border-accent/60";
 
 export default function IdentityPanel() {
+  const t = useT();
   const identity = useAppStore((state) => state.identity);
   const loading = useAppStore((state) => state.identityLoading);
   const loadIdentity = useAppStore((state) => state.loadIdentity);
@@ -70,31 +76,31 @@ export default function IdentityPanel() {
     <div className="flex h-full flex-col gap-3">
       <div className="flex items-center gap-1 text-[11.5px] font-medium text-ink-soft">
         <UserRound size={12} className="text-ink-faint" />
-        当前仓库的提交身份
-        <HelpTip label="只写入当前仓库的 .git/config（git config --local），不会修改全局配置，也不影响其它仓库；保存后本仓库新的提交会用这个身份。" />
+        {t("settings.identity.sectionTitle")}
+        <HelpTip label={t("settings.identity.help")} />
       </div>
 
       {loading && !identity ? (
         <p className="flex items-center gap-2 py-3 text-[11.5px] text-ink-faint">
           <Loader2 size={12} className="animate-spin" />
-          正在读取提交身份…
+          {t("settings.identity.loading")}
         </p>
       ) : (
         <div className="space-y-2.5">
           <label className="block">
             <span className="mb-1 flex items-center justify-between text-[11.5px] font-medium text-ink-soft">
-              提交用户名
+              {t("settings.identity.nameLabel")}
               <span
-                {...tip(nameSource.hint)}
+                {...tip(t(nameSource.hint))}
                 className={`rounded border px-1 py-px text-[9px] font-medium ${nameSource.className}`}
               >
-                {nameSource.label}
+                {t(nameSource.label)}
               </span>
             </span>
             <input
               value={name}
               onChange={(event) => setName(event.target.value)}
-              placeholder="例如：Zhang San"
+              placeholder={t("settings.identity.namePlaceholder")}
               spellCheck={false}
               className={inputClass}
             />
@@ -102,12 +108,12 @@ export default function IdentityPanel() {
 
           <label className="block">
             <span className="mb-1 flex items-center justify-between text-[11.5px] font-medium text-ink-soft">
-              提交邮箱
+              {t("settings.identity.emailLabel")}
               <span
-                {...tip(emailSource.hint)}
+                {...tip(t(emailSource.hint))}
                 className={`rounded border px-1 py-px text-[9px] font-medium ${emailSource.className}`}
               >
-                {emailSource.label}
+                {t(emailSource.label)}
               </span>
             </span>
             <input
@@ -130,7 +136,7 @@ export default function IdentityPanel() {
 
       {(identity?.nameSource === "none" || identity?.emailSource === "none") && !error ? (
         <p className="rounded-md border border-warning/30 bg-warning/8 px-2 py-1.5 text-[10px] text-ink-soft">
-          提交身份未配置完整，git 会拒绝提交。
+          {t("settings.identity.incomplete")}
         </p>
       ) : null}
 
@@ -142,7 +148,7 @@ export default function IdentityPanel() {
           className="inline-flex items-center gap-1.5 rounded-lg bg-accent px-3 py-1.5 text-[12px] font-medium text-white transition-opacity hover:opacity-90 disabled:cursor-default disabled:opacity-45"
         >
           {busy ? <Loader2 size={12} className="animate-spin" /> : <Check size={12} />}
-          保存
+          {t("common.save")}
         </button>
       </div>
     </div>

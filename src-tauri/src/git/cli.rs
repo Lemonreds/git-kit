@@ -3,6 +3,9 @@ use std::path::Path;
 use std::process::{Command, Stdio};
 use std::time::{Duration, Instant};
 
+#[cfg(target_os = "windows")]
+use std::os::windows::process::CommandExt;
+
 use crate::error::AppError;
 
 /// Network / credential touching operations get a hard ceiling so a webview
@@ -54,6 +57,13 @@ pub fn run(repo: &Path, args: &[&str], timeout: Option<Duration>) -> Result<GitO
         .stdin(Stdio::null())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
+
+    // On Windows, prevent console window from appearing
+    #[cfg(target_os = "windows")]
+    {
+        const CREATE_NO_WINDOW: u32 = 0x08000000;
+        command.creation_flags(CREATE_NO_WINDOW);
+    }
 
     let mut child = command.spawn().map_err(|error| {
         AppError::message(format!(

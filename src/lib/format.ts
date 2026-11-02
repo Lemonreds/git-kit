@@ -1,10 +1,30 @@
+import { getLocale, t } from "../i18n";
+import type { Locale, MessageKey } from "../i18n";
 import type { FileStatus } from "./types";
 
-const relativeFormatter = new Intl.RelativeTimeFormat("zh-CN", { numeric: "auto" });
-const absoluteFormatter = new Intl.DateTimeFormat("zh-CN", {
-  dateStyle: "medium",
-  timeStyle: "short",
-});
+// Formatter caches keyed by locale: rebuilt lazily whenever the UI language changes.
+const relativeFormatters = new Map<Locale, Intl.RelativeTimeFormat>();
+const absoluteFormatters = new Map<Locale, Intl.DateTimeFormat>();
+
+function relativeFormatter(): Intl.RelativeTimeFormat {
+  const locale = getLocale();
+  let formatter = relativeFormatters.get(locale);
+  if (!formatter) {
+    formatter = new Intl.RelativeTimeFormat(locale, { numeric: "auto" });
+    relativeFormatters.set(locale, formatter);
+  }
+  return formatter;
+}
+
+function absoluteFormatter(): Intl.DateTimeFormat {
+  const locale = getLocale();
+  let formatter = absoluteFormatters.get(locale);
+  if (!formatter) {
+    formatter = new Intl.DateTimeFormat(locale, { dateStyle: "medium", timeStyle: "short" });
+    absoluteFormatters.set(locale, formatter);
+  }
+  return formatter;
+}
 
 const UNITS: Array<[Intl.RelativeTimeFormatUnit, number]> = [
   ["year", 365 * 24 * 3600 * 1000],
@@ -15,25 +35,28 @@ const UNITS: Array<[Intl.RelativeTimeFormatUnit, number]> = [
   ["minute", 60 * 1000],
 ];
 
-/** `1640000000` (unix seconds) → `3 天前`. */
+/** `1640000000` (unix seconds) → `3 days ago`. */
 export function relativeTime(unixSeconds: number): string {
   const delta = unixSeconds * 1000 - Date.now();
   const magnitude = Math.abs(delta);
-  if (magnitude < 45_000) return "刚刚";
+  if (magnitude < 45_000) return t("lib.justNow");
   for (const [unit, ms] of UNITS) {
     if (magnitude >= ms) {
-      return relativeFormatter.format(Math.round(delta / ms), unit);
+      return relativeFormatter().format(Math.round(delta / ms), unit);
     }
   }
-  return "刚刚";
+  return t("lib.justNow");
 }
 
 export function absoluteTime(unixSeconds: number): string {
-  return absoluteFormatter.format(new Date(unixSeconds * 1000));
+  return absoluteFormatter().format(new Date(unixSeconds * 1000));
 }
 
 export function timeTooltip(unixSeconds: number): string {
-  return `${absoluteTime(unixSeconds)}（${relativeTime(unixSeconds)}）`;
+  return t("lib.dateTimeTooltip", {
+    absolute: absoluteTime(unixSeconds),
+    relative: relativeTime(unixSeconds),
+  });
 }
 
 /** `~` shorthand for the current home directory. */
@@ -63,20 +86,21 @@ export interface StatusMeta {
   tone: "positive" | "negative" | "accent" | "warning" | "neutral";
 }
 
-const STATUS_META: Record<FileStatus, StatusMeta> = {
-  added: { letter: "A", label: "新增", tone: "positive" },
-  modified: { letter: "M", label: "修改", tone: "warning" },
-  deleted: { letter: "D", label: "删除", tone: "negative" },
-  renamed: { letter: "R", label: "重命名", tone: "accent" },
-  copied: { letter: "C", label: "复制", tone: "accent" },
-  typechange: { letter: "T", label: "类型变更", tone: "accent" },
-  untracked: { letter: "U", label: "未跟踪", tone: "positive" },
-  conflicted: { letter: "U", label: "冲突", tone: "negative" },
-  unknown: { letter: "?", label: "变更", tone: "neutral" },
+const STATUS_META: Record<FileStatus, Omit<StatusMeta, "label"> & { labelKey: MessageKey }> = {
+  added: { letter: "A", labelKey: "lib.status.added", tone: "positive" },
+  modified: { letter: "M", labelKey: "lib.status.modified", tone: "warning" },
+  deleted: { letter: "D", labelKey: "lib.status.deleted", tone: "negative" },
+  renamed: { letter: "R", labelKey: "lib.status.renamed", tone: "accent" },
+  copied: { letter: "C", labelKey: "lib.status.copied", tone: "accent" },
+  typechange: { letter: "T", labelKey: "lib.status.typechange", tone: "accent" },
+  untracked: { letter: "U", labelKey: "lib.status.untracked", tone: "positive" },
+  conflicted: { letter: "U", labelKey: "lib.status.conflicted", tone: "negative" },
+  unknown: { letter: "?", labelKey: "lib.status.unknown", tone: "neutral" },
 };
 
 export function statusMeta(status: FileStatus): StatusMeta {
-  return STATUS_META[status] ?? STATUS_META.unknown;
+  const meta = STATUS_META[status] ?? STATUS_META.unknown;
+  return { letter: meta.letter, label: t(meta.labelKey), tone: meta.tone };
 }
 
 export function initials(name: string): string {
@@ -102,7 +126,7 @@ export function clamp(value: number, min: number, max: number): number {
 }
 
 export function formatCount(value: number): string {
-  return value.toLocaleString("zh-CN");
+  return value.toLocaleString(getLocale());
 }
 
 export async function copyText(text: string): Promise<boolean> {

@@ -1,11 +1,12 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "Least-privilege capability: folder picker, reveal in Finder, http(s) links. No filesystem, shell or process APIs are exposed to the webview — all repository access happens in Rust through explicit commands.",
+  "description": "Least-privilege capability: folder picker, reveal in Finder, http(s) links. No filesystem, shell or process APIs are exposed to the webview — all repository access happens in Rust through explicit commands. The built-in terminal follows the same rule: the webview can only ask for an interactive shell inside an already-registered project directory (see src/terminal.rs), never for an arbitrary program or command.",
   "windows": ["main"],
   "permissions": [
     "core:default",
     "core:window:allow-start-dragging",
+    "core:window:allow-set-theme",
     "dialog:allow-open",
     "opener:default"
   ]

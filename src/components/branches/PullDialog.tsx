@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { AlertTriangle, ArrowDownToLine, Check, Loader2, RefreshCw } from "lucide-react";
 
+import { useT } from "../../i18n";
 import { api } from "../../lib/ipc";
 import type { BranchSummary, PullPreview } from "../../lib/types";
 import { useAppStore } from "../../store/appStore";
@@ -17,6 +18,7 @@ interface PullDialogProps {
 }
 
 export default function PullDialog({ branch, switchFirst = false, onClose }: PullDialogProps) {
+  const t = useT();
   const project = useAppStore((state) => state.activeProject);
   const pullBranch = useAppStore((state) => state.pullBranch);
   const syncBranch = useAppStore((state) => state.syncBranch);
@@ -68,7 +70,7 @@ export default function PullDialog({ branch, switchFirst = false, onClose }: Pul
       await load();
       return;
     }
-    setError(outcome.message ?? "拉取失败");
+    setError(outcome.message ?? t("branches.pullFailed"));
   };
 
   // A pull that has to switch branches first is fast-forward only: merging into a
@@ -82,8 +84,8 @@ export default function PullDialog({ branch, switchFirst = false, onClose }: Pul
   return (
     <Modal
       open
-      title="拉取远程提交"
-      subtitle={`${branch.name} ← ${preview?.upstream ?? branch.upstream ?? "origin/同名分支"}`}
+      title={t("branches.pullTitle")}
+      subtitle={`${branch.name} ← ${preview?.upstream ?? branch.upstream ?? t("branches.sameNameUpstream")}`}
       onClose={busy ? () => undefined : onClose}
       width={560}
       footer={
@@ -94,7 +96,7 @@ export default function PullDialog({ branch, switchFirst = false, onClose }: Pul
             disabled={busy !== null}
             className="mr-auto rounded-lg border border-line px-3 py-1.5 text-[12px] font-medium text-ink-soft transition-colors hover:bg-ink/5 hover:text-ink disabled:opacity-50"
           >
-            取消
+            {t("branches.cancel")}
           </button>
           <button
             type="button"
@@ -108,12 +110,12 @@ export default function PullDialog({ branch, switchFirst = false, onClose }: Pul
               <ArrowDownToLine size={12} />
             )}
             {nothingToPull
-              ? "已是最新"
+              ? t("branches.upToDate")
               : switchFirst
-                ? "切换并拉取"
+                ? t("branches.switchAndPull")
                 : needsMergeChoice
-                  ? "合并并拉取"
-                  : "拉取"}
+                  ? t("branches.mergeAndPull")
+                  : t("branches.pullAction")}
           </button>
         </>
       }
@@ -122,7 +124,7 @@ export default function PullDialog({ branch, switchFirst = false, onClose }: Pul
         {loading && !preview ? (
           <p className="flex items-center gap-2 py-4 text-[11.5px] text-ink-faint">
             <Loader2 size={13} className="animate-spin" />
-            正在比对本地与远程…
+            {t("branches.comparingLocalRemote")}
           </p>
         ) : null}
 
@@ -136,7 +138,7 @@ export default function PullDialog({ branch, switchFirst = false, onClose }: Pul
           <div className="rounded-lg border border-negative/35 bg-negative/8 px-3 py-2">
             <p className="flex items-center gap-1 text-[11.5px] font-medium text-negative">
               <AlertTriangle size={11.5} />
-              拉取时出现冲突，仓库停留在 merge 状态
+              {t("branches.pullConflict")}
             </p>
             <p className="mt-1 max-h-32 overflow-y-auto whitespace-pre-line break-words font-mono text-[10px] leading-relaxed text-ink-soft">
               {conflict}
@@ -161,15 +163,16 @@ export default function PullDialog({ branch, switchFirst = false, onClose }: Pul
                   ) : (
                     <span className="text-ink-faint">—</span>
                   )}
-                  <HelpTip label="点「拉取」时先执行 git fetch --prune 再比对：本地无自有提交则快进，否则合并。网络超时 120 秒，复用系统 SSH key / 凭据助手。" />
+                  <HelpTip label={t("branches.pullHint")} />
                 </p>
                 <p className="mt-0.5 text-[10px] text-ink-faint">
-                  落后 <span className="text-warning">{preview.behind}</span> · 领先{" "}
+                  {t("branches.behindLabel")}{" "}
+                  <span className="text-warning">{preview.behind}</span> · {t("branches.aheadLabel")}{" "}
                   <span className={preview.ahead > 0 ? "text-positive" : "text-ink-faint"}>
                     {preview.ahead}
                   </span>
-                  {preview.upToDate ? " · 已是最新" : ""}
-                  {preview.fastForward ? " · 可直接快进" : ""}
+                  {preview.upToDate ? t("branches.upToDateSuffix") : ""}
+                  {preview.fastForward ? t("branches.fastForwardSuffix") : ""}
                 </p>
               </div>
               <button
@@ -183,37 +186,40 @@ export default function PullDialog({ branch, switchFirst = false, onClose }: Pul
                 ) : (
                   <RefreshCw size={11} />
                 )}
-                同步远程状态
+                {t("branches.syncRemoteStatus")}
               </button>
             </div>
 
             {preview.dirty ? (
               <p className="rounded-lg border border-warning/35 bg-warning/8 px-3 py-2 text-[10.5px] leading-relaxed text-ink-soft">
-                工作区有未提交改动；若与拉取的提交改到同一文件，git 会拒绝合并或产生冲突。
+                {t("branches.dirtyPull")}
               </p>
             ) : null}
 
             {missingRemote ? (
               <p className="rounded-lg border border-warning/35 bg-warning/8 px-3 py-2 text-[10.5px] leading-relaxed text-ink-soft">
-                远程还没有 <code className="font-mono">{preview.upstream}</code>，先把本地分支推送上去再拉取。
+                {t("branches.missingRemotePrefix")}
+                <code className="font-mono">{preview.upstream}</code>
+                {t("branches.missingRemoteSuffix")}
               </p>
             ) : null}
 
             <div>
               <p className="mb-1 flex items-center justify-between text-[11.5px] font-medium text-ink-soft">
-                将拉取的提交
+                {t("branches.incomingCommits")}
                 <span className="font-normal text-[10.5px] text-ink-faint">
-                  {preview.incomingCommits.length}
                   {preview.incomingTotal > preview.incomingCommits.length
-                    ? ` / 共 ${preview.incomingTotal}`
-                    : ""}{" "}
-                  个
+                    ? t("branches.commitCountOfTotal", {
+                        shown: preview.incomingCommits.length,
+                        total: preview.incomingTotal,
+                      })
+                    : t("branches.commitCount", { count: preview.incomingCommits.length })}
                 </span>
               </p>
               <div className="overflow-hidden rounded-lg border border-line">
                 <CommitMiniList
                   commits={preview.incomingCommits}
-                  emptyLabel="远程没有新的提交"
+                  emptyLabel={t("branches.noIncomingCommits")}
                   maxHeight={168}
                 />
               </div>
@@ -222,15 +228,15 @@ export default function PullDialog({ branch, switchFirst = false, onClose }: Pul
             {preview.localOnlyCommits.length > 0 ? (
               <div>
                 <p className="mb-1 flex items-center justify-between text-[11.5px] font-medium text-ink-soft">
-                  本地未推送提交
+                  {t("branches.localOnlyCommits")}
                   <span className="font-normal text-[10.5px] text-warning">
-                    {preview.localOnlyTotal} 个 · 合并会生成 merge 提交
+                    {t("branches.localOnlyCount", { count: preview.localOnlyTotal })}
                   </span>
                 </p>
                 <div className="overflow-hidden rounded-lg border border-warning/35">
                   <CommitMiniList
                     commits={preview.localOnlyCommits}
-                    emptyLabel="没有本地独有提交"
+                    emptyLabel={t("branches.noLocalOnlyCommits")}
                     maxHeight={124}
                   />
                 </div>
@@ -239,14 +245,15 @@ export default function PullDialog({ branch, switchFirst = false, onClose }: Pul
 
             {switchFirst ? (
               <p className="rounded-lg border border-line bg-canvas/50 px-3 py-2 text-[10.5px] leading-relaxed text-ink-soft">
-                拉取前会先切换到 <code className="font-mono">{branch.name}</code>
-                ，并保持在该分支；工作区有未提交改动时会先询问。此入口只做快进，不会自动合并。
+                {t("branches.pullSwitchPrefix")}
+                <code className="font-mono">{branch.name}</code>
+                {t("branches.pullSwitchSuffix")}
               </p>
             ) : null}
 
             {divergedBlocked ? (
               <p className="rounded-lg border border-warning/35 bg-warning/8 px-3 py-2 text-[10.5px] leading-relaxed text-ink-soft">
-                本地有 {preview?.ahead ?? 0} 个未推送提交，无法快进拉取。请先推送，或切换到该分支后在「改动」面板里手动选择合并。
+                {t("branches.pullBlockedDiverged", { count: preview?.ahead ?? 0 })}
               </p>
             ) : null}
 
@@ -266,7 +273,7 @@ export default function PullDialog({ branch, switchFirst = false, onClose }: Pul
                   className="sr-only"
                 />
                 <span className="text-[11px] leading-relaxed text-ink-soft">
-                  本地有未推送提交，允许创建合并提交（merge）
+                  {t("branches.allowMergeLabel")}
                 </span>
               </label>
             ) : null}

@@ -15,8 +15,23 @@ use super::cli::{
 use super::repo::{open_repo, remote_names, resolve_rev, short_id, summarize};
 
 const MAX_SCAN: usize = 5000;
-/// How many commit rows a preview lists (the counts stay exact).
+/// How many commit rows a generic preview lists (the counts stay exact).
 const MAX_LISTED_COMMITS: usize = 50;
+/// The squash dialog highlights the commits that will be folded into one, so it
+/// needs a longer window than the generic previews.
+const MAX_SQUASH_LISTED: usize = 500;
+/// Trunk-like refs, most authoritative first: a freshly fetched `origin/main`
+/// must win over a local `main` that may be weeks behind.
+const TRUNK_REFS: [&str; 8] = [
+    "refs/remotes/origin/main",
+    "refs/remotes/origin/master",
+    "refs/remotes/origin/develop",
+    "refs/remotes/origin/trunk",
+    "refs/heads/main",
+    "refs/heads/master",
+    "refs/heads/develop",
+    "refs/heads/trunk",
+];
 
 fn open(path: &Path) -> Result<Repository, AppError> {
     open_repo(&path.display().to_string())
@@ -40,45 +55,93 @@ fn base_label(ref_name: &str) -> String {
         .to_string()
 }
 
-/// The branch the current one was most likely created from: `master`, `main`,
-/// their remote counterparts, the configured upstream, then any other branch.
-fn detect_base(repo: &Repository, branch: &str) -> Option<(String, Oid)> {
-    let candidates = [
-        "refs/heads/master",
-        "refs/heads/main",
-        "refs/remotes/origin/master",
-        "refs/remotes/origin/main",
-    ];
+/// How many commits `tip` added on top of `base`, i.e. the size of the branch's
+/// own history. `None` when the two have no common ancestor.
+fn divergence(repo: &Repository, tip: Oid, base: Oid) -> Option<usize> {
+    repo.graph_ahead_behind(tip, base)
+        .ok()
+        .map(|(ahead, _behind)| ahead)
+}
 
-    for name in candidates {
-        if base_label(name) == branch {
+/// The branch this one most likely diverged from.
+///
+/// Candidates are the known trunk refs (remote before local); the winner is the
+/// one whose fork point sits *closest* to the tip. That matters on real repos:
+/// a fresh `origin/main` and a stale local `main` both exist, and measuring
+/// against the local one inflates every branch's "commits since fork".
+///
+/// The branch's own ref and anything pointing at the tip are skipped — matching
+/// a branch against itself always yields a distance of zero.
+fn detect_base(repo: &Repository, branch: &str) -> Option<(String, Oid)> {
+    let tip = branch_tip(repo, branch).ok()?;
+
+    let mut nearest: Option<(String, Oid, usize)> = None;
+    for name in TRUNK_REFS {
+        let label = base_label(name);
+        if label == branch {
             continue;
         }
-        if let Ok(oid) = repo.refname_to_id(name) {
-            return Some((base_label(name), oid));
+        let Ok(oid) = repo.refname_to_id(name) else {
+            continue;
+        };
+        let Some(ahead) = divergence(repo, tip, oid) else {
+            continue;
+        };
+        // Strictly smaller keeps the earlier (remote-first) ref on a tie.
+        if nearest.as_ref().is_none_or(|(_, _, seen)| ahead < *seen) {
+            nearest = Some((label, oid, ahead));
         }
     }
+    if let Some((label, oid, _)) = nearest {
+        return Some((label, oid));
+    }
 
+    // No conventional trunk: fall back to the configured upstream, then to
+    // whichever other branch diverges least. Zero-divergence candidates are
+    // skipped here, otherwise the branch's own remote copy would win.
     if let Ok(local) = repo.find_branch(branch, BranchType::Local) {
         if let Ok(upstream) = local.upstream() {
             if let (Ok(Some(name)), Some(oid)) = (upstream.name(), upstream.get().target()) {
-                return Some((base_label(name), oid));
+                if divergence(repo, tip, oid).is_some_and(|ahead| ahead > 0) {
+                    return Some((base_label(name), oid));
+                }
             }
         }
     }
 
-    let mut others: Vec<String> = repo
-        .branches(Some(BranchType::Local))
-        .ok()?
-        .flatten()
-        .filter_map(|(branch, _)| branch.name().ok().flatten().map(str::to_string))
-        .filter(|name| name != branch)
-        .collect();
-    others.sort();
-    others
-        .first()
-        .and_then(|name| repo.refname_to_id(&format!("refs/heads/{name}")).ok())
-        .map(|oid| (others[0].clone(), oid))
+    let mut candidates: Vec<(String, Oid)> = Vec::new();
+    for kind in [BranchType::Local, BranchType::Remote] {
+        let Ok(all) = repo.branches(Some(kind)) else {
+            continue;
+        };
+        for (reference, _) in all.flatten() {
+            let Ok(Some(name)) = reference.name() else {
+                continue;
+            };
+            let label = base_label(name);
+            if label == branch || label.ends_with(&format!("/{branch}")) {
+                continue;
+            }
+            if let Some(oid) = reference.get().target() {
+                candidates.push((label, oid));
+            }
+        }
+    }
+    candidates.sort_by(|left, right| left.0.cmp(&right.0));
+
+    let mut nearest: Option<(String, Oid, usize)> = None;
+    for (label, oid) in candidates {
+        let Some(ahead) = divergence(repo, tip, oid) else {
+            continue;
+        };
+        if ahead == 0 {
+            continue;
+        }
+        if nearest.as_ref().is_none_or(|(_, _, seen)| ahead < *seen) {
+            nearest = Some((label, oid, ahead));
+        }
+    }
+    nearest.map(|(label, oid, _)| (label, oid))
 }
 
 struct RangeScan {
@@ -112,7 +175,7 @@ fn scan_first_parent(
             current.id().to_string(),
             current.message().unwrap_or_default().trim_end().to_string(),
         ));
-        if commits.len() < MAX_LISTED_COMMITS {
+        if commits.len() < MAX_SQUASH_LISTED {
             commits.push(summarize(&current));
         }
 
@@ -195,9 +258,12 @@ pub fn squash_commits(
     let repo = open(repo_path)?;
     let tip = branch_tip(&repo, branch)?;
     let total = scan_first_parent(&repo, tip, None)?.count;
-    if count > total {
+    // `reset --soft HEAD~count` needs a commit to reset *to*: the oldest commit of
+    // the branch can not be folded away, so `total - 1` is the ceiling.
+    if count >= total {
         return Err(AppError::message(format!(
-            "分支只有 {total} 个提交，无法压缩 {count} 个"
+            "分支只有 {total} 个提交，最多可压缩 {} 个（需要保留一个基线提交）",
+            total.saturating_sub(1)
         )));
     }
 

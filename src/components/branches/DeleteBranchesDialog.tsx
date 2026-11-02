@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { AlertTriangle, Check, Loader2, ShieldOff, Trash2 } from "lucide-react";
 
+import { useT } from "../../i18n";
 import { isProtectedBranch } from "../../lib/branchTemplate";
 import { relativeTime } from "../../lib/format";
 import type { BranchSummary, DeleteFailure } from "../../lib/types";
@@ -16,6 +17,7 @@ interface DeleteBranchesDialogProps {
 }
 
 export default function DeleteBranchesDialog({ branches, onClose }: DeleteBranchesDialogProps) {
+  const t = useT();
   const deleteLocalBranches = useAppStore((state) => state.deleteLocalBranches);
   const notify = useAppStore((state) => state.notify);
   const snapshot = useAppStore((state) => state.snapshot);
@@ -73,8 +75,11 @@ export default function DeleteBranchesDialog({ branches, onClose }: DeleteBranch
       notify(
         "success",
         remoteDeleted.length > 0
-          ? `已删除 ${deleted.length} 个本地分支、${remoteDeleted.length} 个远程分支`
-          : `已删除 ${deleted.length} 个本地分支`,
+          ? t("branches.deletedBoth", {
+              local: deleted.length,
+              remote: remoteDeleted.length,
+            })
+          : t("branches.deletedLocalCount", { count: deleted.length }),
       );
     }
     if (failed.length > 0 || remoteFailed.length > 0) {
@@ -85,23 +90,34 @@ export default function DeleteBranchesDialog({ branches, onClose }: DeleteBranch
     onClose();
   };
 
+  const separator = t("branches.listSeparator");
   const confirmDescription =
     selected.length > 0
-      ? `将删除 ${selected.length} 个分支：${selected.slice(0, 6).join("、")}${
-          selected.length > 6 ? ` 等 ${selected.length} 个` : ""
-        }。${forceUnmerged ? "未合并的提交会被一并丢弃。" : ""}${
+      ? [
+          selected.length > 6
+            ? t("branches.confirmDeleteDescriptionMore", {
+                count: selected.length,
+                names: selected.slice(0, 6).join(separator),
+              })
+            : t("branches.confirmDeleteDescription", {
+                count: selected.length,
+                names: selected.join(separator),
+              }),
+          forceUnmerged ? t("branches.confirmDeleteForce") : "",
           deleteRemote
-            ? "对应的远程分支会一起删除（git push --delete），其他人再次拉取时该分支已不存在。"
-            : "远程分支不受影响。"
-        }`
+            ? t("branches.confirmDeleteRemote")
+            : t("branches.confirmDeleteKeepRemote"),
+        ]
+          .filter(Boolean)
+          .join(" ")
       : "";
 
   return (
     <>
       <Modal
         open
-        title="删除分支"
-        subtitle="删除本地 refs/heads，可选同时删除远程分支"
+        title={t("branches.deleteBranch")}
+        subtitle={t("branches.deleteSubtitle")}
         onClose={busy ? () => undefined : onClose}
         width={540}
         footer={
@@ -112,7 +128,7 @@ export default function DeleteBranchesDialog({ branches, onClose }: DeleteBranch
               disabled={busy}
               className="rounded-lg border border-line px-3 py-1.5 text-[12px] font-medium text-ink-soft transition-colors hover:bg-ink/5 hover:text-ink disabled:opacity-50"
             >
-              关闭
+              {t("branches.close")}
             </button>
             <button
               type="button"
@@ -121,7 +137,9 @@ export default function DeleteBranchesDialog({ branches, onClose }: DeleteBranch
               className="inline-flex items-center gap-1.5 rounded-lg bg-negative px-3 py-1.5 text-[12px] font-medium text-white transition-opacity hover:opacity-90 disabled:cursor-default disabled:opacity-45"
             >
               {busy ? <Loader2 size={12} className="animate-spin" /> : <Trash2 size={12} />}
-              删除 {selected.length} 个分支{deleteRemote && hasRemote ? "（含远程）" : ""}
+              {deleteRemote && hasRemote
+                ? t("branches.deleteCountWithRemote", { count: selected.length })
+                : t("branches.deleteCount", { count: selected.length })}
             </button>
           </>
         }
@@ -130,10 +148,12 @@ export default function DeleteBranchesDialog({ branches, onClose }: DeleteBranch
           <div className="flex items-center justify-between">
             <p className="flex items-center gap-1.5 text-[11.5px] font-medium text-ink-soft">
               <ShieldOff size={12} className="text-ink-faint" />
-              选择要删除的分支
+              {t("branches.selectToDelete")}
             </p>
             <div className="flex items-center gap-2">
-              <span className="text-[10.5px] text-ink-faint">已选 {selected.length} / {selectable.length}</span>
+              <span className="text-[10.5px] text-ink-faint">
+                {t("branches.selectedOf", { selected: selected.length, total: selectable.length })}
+              </span>
               <button
                 type="button"
                 onClick={() =>
@@ -145,14 +165,16 @@ export default function DeleteBranchesDialog({ branches, onClose }: DeleteBranch
                 }
                 className="rounded-md border border-line px-1.5 py-0.5 text-[10.5px] text-ink-soft transition-colors hover:bg-ink/5 hover:text-ink"
               >
-                {allSelected ? "清空" : "全选"}
+                {allSelected ? t("branches.clearSelection") : t("branches.selectAll")}
               </button>
             </div>
           </div>
 
           <div className="max-h-[232px] overflow-y-auto rounded-lg border border-line">
             {candidates.length === 0 ? (
-              <p className="px-3 py-3 text-[11.5px] text-ink-faint">这个仓库没有本地分支</p>
+              <p className="px-3 py-3 text-[11.5px] text-ink-faint">
+                {t("branches.noLocalBranches")}
+              </p>
             ) : (
               candidates.map((branch) => {
                 const disabled = branch.isHead;
@@ -186,17 +208,17 @@ export default function DeleteBranchesDialog({ branches, onClose }: DeleteBranch
                         <span className="truncate font-mono text-[12px] text-ink">{branch.name}</span>
                         {branch.isHead ? (
                           <span className="shrink-0 rounded bg-accent-soft px-1 py-px text-[9px] font-medium text-accent">
-                            当前分支
+                            {t("branches.currentBranch")}
                           </span>
                         ) : null}
                         {isProtectedBranch(branch.name) ? (
                           <span className="shrink-0 rounded border border-line px-1 py-px text-[9px] text-ink-faint">
-                            保护分支
+                            {t("branches.protectedBranch")}
                           </span>
                         ) : null}
                         {branch.ahead ? (
                           <span className="shrink-0 font-mono text-[9.5px] text-warning">
-                            ↑{branch.ahead} 未推送
+                            {t("branches.aheadUnpushed", { count: branch.ahead })}
                           </span>
                         ) : null}
                       </span>
@@ -209,7 +231,7 @@ export default function DeleteBranchesDialog({ branches, onClose }: DeleteBranch
                             <span className="shrink-0">{relativeTime(branch.lastCommit.committedAt)}</span>
                           </>
                         ) : (
-                          <span>暂无提交</span>
+                          <span>{t("branches.noCommits")}</span>
                         )}
                       </span>
                     </span>
@@ -235,8 +257,8 @@ export default function DeleteBranchesDialog({ branches, onClose }: DeleteBranch
             />
             <span className="min-w-0 flex-1">
               <span className="flex items-center gap-1 text-[11.5px] font-medium text-ink">
-                强制删除未合并分支
-                <HelpTip label="默认只删除已合并分支（git branch -d）。勾选后对未合并的分支使用 -D，其中未推送的提交将永久丢失。远程分支是否删除由下面的「同时删除远程分支」单独控制。" />
+                {t("branches.forceUnmergedLabel")}
+                <HelpTip label={t("branches.forceUnmergedHint")} />
               </span>
             </span>
           </label>
@@ -266,13 +288,13 @@ export default function DeleteBranchesDialog({ branches, onClose }: DeleteBranch
             />
             <span className="min-w-0 flex-1">
               <span className="flex items-center gap-1 text-[11.5px] font-medium text-ink">
-                同时删除远程分支
-                <HelpTip label="勾选后，本地分支删除成功会对每个分支执行 git push <remote> --delete <branch>。远程用该分支的 upstream，没有则回退到 origin。远程分支删除后无法从远程恢复，协作者拉取时该分支会消失；从未推送过的分支会跳过（不算失败）。" />
+                {t("branches.deleteRemoteLabel")}
+                <HelpTip label={t("branches.deleteRemoteHint")} />
               </span>
               <span className="mt-0.5 block text-[10.5px] leading-relaxed text-ink-faint">
                 {hasRemote
-                  ? "默认不勾选。勾选后远程分支会一并删除，且无法在远程恢复。"
-                  : "这个仓库还没有配置远程地址，无法删除远程分支。"}
+                  ? t("branches.deleteRemoteNote")
+                  : t("branches.deleteRemoteNoteNoRemote")}
               </span>
             </span>
           </label>
@@ -281,10 +303,14 @@ export default function DeleteBranchesDialog({ branches, onClose }: DeleteBranch
             <div className="rounded-lg border border-negative/30 bg-negative/8 px-3 py-2">
               <p className="flex items-center gap-1 text-[11.5px] font-medium text-negative">
                 <AlertTriangle size={11.5} />
-                {report.failed.length + report.remoteFailed.length} 个分支没有完全删除
-                {report.deleted.length > 0 ? `（已删除 ${report.deleted.length} 个本地分支）` : ""}
+                {t("branches.deleteReportTitle", {
+                  count: report.failed.length + report.remoteFailed.length,
+                })}
+                {report.deleted.length > 0
+                  ? t("branches.deleteReportLocal", { count: report.deleted.length })
+                  : ""}
                 {report.remoteDeleted.length > 0
-                  ? `（已删除 ${report.remoteDeleted.length} 个远程分支）`
+                  ? t("branches.deleteReportRemote", { count: report.remoteDeleted.length })
                   : ""}
               </p>
               <ul className="mt-1 space-y-1">
@@ -302,9 +328,9 @@ export default function DeleteBranchesDialog({ branches, onClose }: DeleteBranch
 
       <ConfirmDialog
         open={confirming}
-        title={`删除 ${selected.length} 个分支？`}
+        title={t("branches.confirmDeleteManyTitle", { count: selected.length })}
         description={confirmDescription}
-        confirmLabel="确认删除"
+        confirmLabel={t("branches.confirmDeleteConfirm")}
         tone="danger"
         onConfirm={() => void submit()}
         onCancel={() => setConfirming(false)}

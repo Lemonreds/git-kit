@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { CalendarPlus, Check, Loader2, Plus, Sparkles, Star, Trash2 } from "lucide-react";
 
+import { useT } from "../../i18n";
 import {
   DATE_FORMATS,
   DATE_TOKEN,
@@ -27,8 +28,9 @@ function blankTemplate(): BranchTemplate {
   };
 }
 
-/** 分支名模板管理面板（设置弹窗的第三个 tab）。 */
+/** Branch name template manager (the third tab of the settings dialog). */
 export default function BranchTemplatePanel() {
+  const t = useT();
   const templates = useAppStore((state) => state.templates);
   const defaultTemplateId = useAppStore((state) => state.defaultTemplateId);
   const saveTemplates = useAppStore((state) => state.saveTemplates);
@@ -39,7 +41,7 @@ export default function BranchTemplatePanel() {
   const [busy, setBusy] = useState(false);
   const ruleInput = useRef<HTMLInputElement | null>(null);
 
-  // Mount-only snapshot: edits stay local until 保存.
+  // Mount-only snapshot: edits stay local until save.
   useEffect(() => {
     const copy = templates.map((template) => ({ ...template }));
     setDraft(copy);
@@ -124,7 +126,7 @@ export default function BranchTemplatePanel() {
           <div className="min-h-0 flex-1 space-y-0.5 overflow-y-auto rounded-lg border border-line bg-canvas/40 p-1">
             {draft.length === 0 ? (
               <p className="px-2 py-3 text-[11px] leading-relaxed text-ink-faint">
-                还没有模板，新建一个即可。
+                {t("settings.templates.empty")}
               </p>
             ) : (
               draft.map((template) => {
@@ -144,14 +146,14 @@ export default function BranchTemplatePanel() {
                           active ? "text-ink" : "text-ink-soft"
                         }`}
                       >
-                        {template.name.trim() || "未命名模板"}
+                        {template.name.trim() || t("settings.templates.untitled")}
                       </span>
                       {selectedDefault === template.id ? (
                         <Star size={10} className="shrink-0 fill-current text-accent" />
                       ) : null}
                     </span>
                     <span className="mt-0.5 block truncate font-mono text-[10px] text-ink-faint">
-                      {template.rule || "（空规则）"}
+                      {template.rule || t("settings.templates.emptyRule")}
                     </span>
                   </button>
                 );
@@ -164,7 +166,7 @@ export default function BranchTemplatePanel() {
             className="mt-1.5 inline-flex items-center justify-center gap-1 rounded-lg border border-line py-1.5 text-[11.5px] font-medium text-ink-soft transition-colors hover:bg-ink/5 hover:text-ink"
           >
             <Plus size={12} />
-            新建模板
+            {t("settings.templates.new")}
           </button>
         </div>
 
@@ -172,17 +174,19 @@ export default function BranchTemplatePanel() {
           {!selected ? (
             <div className="grid h-full place-items-center rounded-lg border border-dashed border-line px-4 text-center">
               <p className="text-[11.5px] leading-relaxed text-ink-faint">
-                选择一个模板，或新建模板。
+                {t("settings.templates.selectHint")}
               </p>
             </div>
           ) : (
             <div className="space-y-3">
               <label className="block">
-                <span className="mb-1 block text-[11.5px] font-medium text-ink-soft">模板名称</span>
+                <span className="mb-1 block text-[11.5px] font-medium text-ink-soft">
+                  {t("settings.templates.nameLabel")}
+                </span>
                 <input
                   value={selected.name}
                   onChange={(event) => update({ name: event.target.value })}
-                  placeholder="例如：生产基线"
+                  placeholder={t("settings.templates.namePlaceholder")}
                   className="w-full rounded-lg border border-line bg-panel px-2.5 py-1.5 text-[12px] text-ink outline-none transition-colors focus:border-accent/60"
                 />
               </label>
@@ -190,17 +194,17 @@ export default function BranchTemplatePanel() {
               <div>
                 <div className="mb-1 flex items-center justify-between">
                   <span className="flex items-center gap-1 text-[11.5px] font-medium text-ink-soft">
-                    模板规则
-                    <HelpTip label="用 {date} 表示日期占位符，其余字符固定。例如 prod_{date}_BASE 会生成 prod_20261029_BASE。" />
+                    {t("settings.templates.ruleLabel")}
+                    <HelpTip label={t("settings.templates.ruleHelp")} />
                   </span>
                   <button
                     type="button"
                     onClick={insertDateToken}
-                    {...tip("在光标处插入日期占位符")}
+                    {...tip(t("settings.templates.insertDateTip"))}
                     className="inline-flex items-center gap-1 rounded-md border border-line px-1.5 py-0.5 text-[10.5px] text-ink-soft transition-colors hover:border-accent/50 hover:text-accent"
                   >
                     <CalendarPlus size={11} />
-                    插入日期
+                    {t("settings.templates.insertDate")}
                   </button>
                 </div>
                 <input
@@ -218,7 +222,7 @@ export default function BranchTemplatePanel() {
                         key={index}
                         className="rounded bg-accent-soft px-1.5 py-px font-mono text-[10px] font-medium text-accent"
                       >
-                        日期
+                        {t("settings.templates.dateToken")}
                       </span>
                     ) : (
                       <span key={index} className="font-mono text-[10.5px] text-ink-faint">
@@ -227,13 +231,17 @@ export default function BranchTemplatePanel() {
                     ),
                   )}
                   {ruleSegments(selected.rule).length === 0 ? (
-                    <span className="text-[10.5px] text-ink-faint">规则为空</span>
+                    <span className="text-[10.5px] text-ink-faint">
+                      {t("settings.templates.ruleIsEmpty")}
+                    </span>
                   ) : null}
                 </div>
               </div>
 
               <label className="block">
-                <span className="mb-1 block text-[11.5px] font-medium text-ink-soft">日期格式</span>
+                <span className="mb-1 block text-[11.5px] font-medium text-ink-soft">
+                  {t("settings.templates.dateFormat")}
+                </span>
                 <div className="flex flex-wrap gap-1">
                   {DATE_FORMATS.map((option) => (
                     <button
@@ -255,7 +263,7 @@ export default function BranchTemplatePanel() {
               <div className="rounded-lg border border-line bg-canvas/50 px-3 py-2">
                 <p className="flex items-center gap-1 text-[10.5px] text-ink-faint">
                   <Sparkles size={10.5} />
-                  预览（今天）
+                  {t("settings.templates.preview")}
                 </p>
                 <p className="mt-0.5 break-all font-mono text-[12px] font-medium text-ink">
                   {preview || "—"}
@@ -275,7 +283,9 @@ export default function BranchTemplatePanel() {
                   }`}
                 >
                   {selectedDefault === selected.id ? <Check size={11} /> : <Star size={11} />}
-                  {selectedDefault === selected.id ? "默认模板" : "设为默认"}
+                  {selectedDefault === selected.id
+                    ? t("settings.templates.isDefault")
+                    : t("settings.templates.setDefault")}
                 </button>
                 <button
                   type="button"
@@ -283,12 +293,12 @@ export default function BranchTemplatePanel() {
                   className="ml-auto inline-flex items-center gap-1 rounded-md border border-negative/30 px-2 py-1 text-[11px] font-medium text-negative transition-colors hover:border-negative/55 hover:bg-negative/10"
                 >
                   <Trash2 size={11} />
-                  删除模板
+                  {t("settings.templates.delete")}
                 </button>
               </div>
 
               {!selected.name.trim() || !selected.rule.trim() ? (
-                <p className="text-[10.5px] text-negative">模板名称与规则都不能为空</p>
+                <p className="text-[10.5px] text-negative">{t("settings.templates.invalid")}</p>
               ) : null}
             </div>
           )}
@@ -303,7 +313,7 @@ export default function BranchTemplatePanel() {
           className="inline-flex items-center gap-1.5 rounded-lg bg-accent px-3 py-1.5 text-[12px] font-medium text-white transition-opacity hover:opacity-90 disabled:cursor-default disabled:opacity-45"
         >
           {busy ? <Loader2 size={12} className="animate-spin" /> : null}
-          保存模板
+          {t("settings.templates.save")}
         </button>
       </div>    </div>
   );

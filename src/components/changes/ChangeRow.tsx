@@ -1,5 +1,6 @@
 import { EyeOff, Plus, Trash2, Undo2 } from "lucide-react";
 
+import { useT } from "../../i18n";
 import { baseName, dirName, statusMeta } from "../../lib/format";
 import type { WorktreeEntry } from "../../lib/types";
 import type { FileStatus } from "../../lib/types";
@@ -35,6 +36,7 @@ export default function ChangeRow({
   onDiscard,
   onIgnore,
 }: ChangeRowProps) {
+  const t = useT();
   const status: FileStatus | null = side === "staged" ? entry.staged : entry.unstaged;
   const meta = statusMeta(status ?? "modified");
   const conflicted = entry.conflicted;
@@ -55,7 +57,7 @@ export default function ChangeRow({
           className={`grid h-[16px] w-[16px] shrink-0 place-items-center rounded-[4px] text-[9px] font-bold ${
             conflicted ? "bg-negative/14 text-negative" : TONE_CLASS[meta.tone]
           }`}
-          {...tip(conflicted ? "冲突" : meta.label)}        >
+          {...tip(conflicted ? t("changes.conflict") : meta.label)}        >
           {conflicted ? "!" : meta.letter}
         </span>
 
@@ -76,27 +78,27 @@ export default function ChangeRow({
 
         {status === "untracked" ? (
           <span className="shrink-0 rounded bg-positive/12 px-1 py-px text-[9px] font-medium text-positive">
-            未跟踪
+            {t("changes.untracked")}
           </span>
         ) : null}
       </button>
 
       <div className="absolute right-1 top-1/2 hidden -translate-y-1/2 items-center gap-0.5 rounded-md bg-raised/95 px-0.5 py-0.5 shadow-float group-hover:flex group-focus-within:flex">
         {side === "unstaged" ? (
-          <IconButton label="暂存此文件" size="sm" onClick={onStage}>
+          <IconButton label={t("changes.stageFile")} size="sm" onClick={onStage}>
             <Plus size={13} />
           </IconButton>
         ) : (
-          <IconButton label="取消暂存此文件" size="sm" onClick={onUnstage}>
+          <IconButton label={t("changes.unstageFile")} size="sm" onClick={onUnstage}>
             <Undo2 size={13} />
           </IconButton>
         )}
         {onIgnore && status === "untracked" ? (
-          <IconButton label="加入 .gitignore" size="sm" onClick={onIgnore}>
+          <IconButton label={t("changes.ignorePath")} size="sm" onClick={onIgnore}>
             <EyeOff size={13} />
           </IconButton>
         ) : null}
-        <IconButton label="放弃此文件的改动" size="sm" tone="danger" onClick={onDiscard}>
+        <IconButton label={t("changes.discardFile")} size="sm" tone="danger" onClick={onDiscard}>
           <Trash2 size={13} />
         </IconButton>
       </div>

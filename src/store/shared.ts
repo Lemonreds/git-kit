@@ -1,3 +1,5 @@
+import { t } from "../i18n";
+import { translateError } from "../i18n/errors";
 import type {
   CommitFiles,
   CommitPage,
@@ -11,7 +13,7 @@ import { LRUCache } from "../lib/lruCache";
 import type { PaneMode, ToastKind } from "./types";
 
 export const PAGE_SIZE = 50;
-/** Remote branches loaded per page; 「加载更多」adds this many. */
+/** Remote branches loaded per page; the load-more button adds this many. */
 export const REMOTE_PAGE = 10;
 
 /**
@@ -59,10 +61,27 @@ export function releaseTransientCaches() {
   diffCache.clear();
 }
 
+/**
+ * A thrown `IpcError` carries a stable `code`. Checked structurally so `store/`
+ * never imports `lib/ipc.ts` (which would create an import cycle).
+ */
+function codedError(value: unknown): { code: string; message: string } | null {
+  if (typeof value !== "object" || value === null || !("code" in value)) return null;
+  const candidate = value as { code?: unknown; message?: unknown };
+  if (typeof candidate.code !== "string") return null;
+  return {
+    code: candidate.code,
+    message:
+      typeof candidate.message === "string" ? candidate.message : t("store.unknownError"),
+  };
+}
+
 export function errorMessage(error: unknown): string {
+  const coded = codedError(error);
+  if (coded) return translateError(coded.code, coded.message);
   if (error instanceof Error) return error.message;
   if (typeof error === "string") return error;
-  return "操作失败，请重试";
+  return t("store.unknownError");
 }
 
 export function cacheKey(...parts: Array<string | null | undefined>): string {

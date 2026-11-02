@@ -11,6 +11,7 @@ import {
   Trash2,
 } from "lucide-react";
 
+import { useT } from "../../i18n";
 import { api } from "../../lib/ipc";
 import { copyText, shortPath } from "../../lib/format";
 import type { Project, RemoteInfo } from "../../lib/types";
@@ -29,6 +30,7 @@ function messageOf(error: unknown): string {
 }
 
 export default function RemotesPanel() {
+  const t = useT();
   const projects = useAppStore((state) => state.projects);
   const activeProject = useAppStore((state) => state.activeProject);
   const notify = useAppStore((state) => state.notify);
@@ -111,7 +113,7 @@ export default function RemotesPanel() {
       const created = await api.addRemote(target.path, name.trim(), url.trim());
       await load();
       await syncWindow();
-      notify("success", `已添加远程仓库 ${created.name}`);
+      notify("success", t("settings.remotes.added", { name: created.name }));
       setName("");
       setUrl("");
     } catch (error) {
@@ -128,9 +130,15 @@ export default function RemotesPanel() {
       const result = await api.removeRemote(target.path, remote.name);
       await load();
       await syncWindow();
-      const detail =
-        result.removedTracking > 0 ? `，同时清理了 ${result.removedTracking} 个远程跟踪分支` : "";
-      notify("success", `已删除远程仓库 ${result.name}${detail}`);
+      notify(
+        "success",
+        result.removedTracking > 0
+          ? t("settings.remotes.removedWithTracking", {
+              name: result.name,
+              count: result.removedTracking,
+            })
+          : t("settings.remotes.removed", { name: result.name }),
+      );
     } catch (error) {
       setFormError(messageOf(error));
     }
@@ -138,7 +146,7 @@ export default function RemotesPanel() {
 
   const copy = async (value: string) => {
     const ok = await copyText(value);
-    notify(ok ? "success" : "error", ok ? "已复制" : "复制失败");
+    notify(ok ? "success" : "error", ok ? t("settings.remotes.copied") : t("common.copyFailed"));
   };
 
   return (
@@ -157,11 +165,11 @@ export default function RemotesPanel() {
           <span className="min-w-0 flex-1">
             <span className="flex items-center gap-1.5">
               <span className="truncate text-[12px] font-medium text-ink">
-                {target?.name ?? "未选择仓库"}
+                {target?.name ?? t("settings.remotes.noRepo")}
               </span>
               {isActiveTarget ? (
                 <span className="shrink-0 rounded border border-accent/35 bg-accent-soft px-1 py-px text-[9px] font-medium text-accent">
-                  当前选中
+                  {t("settings.remotes.current")}
                 </span>
               ) : null}
             </span>
@@ -178,7 +186,7 @@ export default function RemotesPanel() {
           />
         </button>
         {target ? (
-          <IconButton label="复制仓库路径" size="sm" onClick={() => void copy(target.path)}>
+          <IconButton label={t("settings.remotes.copyPath")} size="sm" onClick={() => void copy(target.path)}>
             <Copy size={12} />
           </IconButton>
         ) : null}
@@ -219,11 +227,13 @@ export default function RemotesPanel() {
                           {project.name}
                         </span>
                         <span className="mt-0.5 block truncate font-mono text-[9.5px] text-ink-faint">
-                          {disabled ? project.statusHint ?? "无法访问" : shortPath(project.path)}
+                          {disabled ? project.statusHint ?? t("settings.remotes.unavailable") : shortPath(project.path)}
                         </span>
                       </span>
                       {project.id === activeProject?.id ? (
-                        <span className="shrink-0 text-[9px] text-ink-faint">窗口当前</span>
+                        <span className="shrink-0 text-[9px] text-ink-faint">
+                          {t("settings.remotes.windowCurrent")}
+                        </span>
                       ) : null}
                       {selected ? <Check size={11} className="shrink-0 text-accent" /> : null}
                     </button>
@@ -236,18 +246,20 @@ export default function RemotesPanel() {
       </div>
 
       <div className="flex items-center justify-between">
-        <p className="text-[11.5px] font-medium text-ink-soft">远程地址</p>
-        <span className="text-[10.5px] text-ink-faint">{remotes.length} 个</span>
+        <p className="text-[11.5px] font-medium text-ink-soft">{t("settings.remotes.sectionTitle")}</p>
+        <span className="text-[10.5px] text-ink-faint">
+          {t("settings.remotes.count", { count: remotes.length })}
+        </span>
       </div>
 
       {!targetReady ? (
         <p className="rounded-lg border border-warning/30 bg-warning/8 px-3 py-2 text-[10.5px] leading-relaxed text-ink-soft">
-          该仓库当前不可读，无法修改远程配置。
+          {t("settings.remotes.unreadable")}
         </p>
       ) : loading ? (
         <p className="flex items-center gap-2 py-3 text-[11.5px] text-ink-faint">
           <Loader2 size={12} className="animate-spin" />
-          正在读取远程仓库…
+          {t("settings.remotes.loading")}
         </p>
       ) : loadError ? (
         <p className="whitespace-pre-line rounded-lg border border-negative/30 bg-negative/8 px-2.5 py-2 font-mono text-[10px] leading-relaxed text-negative">
@@ -256,7 +268,7 @@ export default function RemotesPanel() {
       ) : remotes.length === 0 ? (
         <div className="flex items-center justify-center gap-2 rounded-lg border border-dashed border-line-strong/70 bg-canvas/40 px-3 py-3">
           <Cloud size={14} className="shrink-0 text-ink-faint" />
-          <p className="text-[11.5px] font-medium text-ink">还没有远程仓库</p>
+          <p className="text-[11.5px] font-medium text-ink">{t("settings.remotes.empty")}</p>
         </div>
       ) : (
         <div className="overflow-hidden rounded-lg border border-line">
@@ -273,11 +285,11 @@ export default function RemotesPanel() {
                   </span>
                   {remote.isOrigin ? (
                     <span className="shrink-0 rounded bg-accent-soft px-1 py-px text-[9px] font-medium text-accent">
-                      默认远程
+                      {t("settings.remotes.default")}
                     </span>
                   ) : null}
                   <span className="shrink-0 rounded border border-line px-1 py-px text-[9px] text-ink-faint">
-                    跟踪 {remote.trackingBranches}
+                    {t("settings.remotes.tracking", { count: remote.trackingBranches })}
                   </span>
                 </p>
                 <p
@@ -288,11 +300,15 @@ export default function RemotesPanel() {
                   {remote.host ? <span className="ml-1.5">{remote.url}</span> : null}
                 </p>
               </div>
-              <IconButton label="复制远程地址" size="sm" onClick={() => void copy(remote.url)}>
+              <IconButton
+                label={t("settings.remotes.copyUrl")}
+                size="sm"
+                onClick={() => void copy(remote.url)}
+              >
                 <Copy size={12} />
               </IconButton>
               <IconButton
-                label="删除远程仓库"
+                label={t("settings.remotes.remove")}
                 size="sm"
                 tone="danger"
                 onClick={() => setPendingRemove(remote)}
@@ -307,12 +323,14 @@ export default function RemotesPanel() {
       <div className="rounded-lg border border-line bg-canvas/40 p-2.5">
         <p className="mb-1.5 flex items-center gap-1 text-[11.5px] font-medium text-ink-soft">
           <Plus size={11} />
-          添加远程仓库
-          <HelpTip label="支持 HTTPS、SSH 与 git@host:org/repo.git 形式。只校验名称格式与重名，不联网验证可达性；推送 / 拉取时才会真正访问。" />
+          {t("settings.remotes.addTitle")}
+          <HelpTip label={t("settings.remotes.addHelp")} />
         </p>
         <div className="flex items-start gap-2">
           <label className="w-[104px] shrink-0">
-            <span className="mb-1 block text-[10px] text-ink-faint">名称</span>
+            <span className="mb-1 block text-[10px] text-ink-faint">
+              {t("settings.remotes.nameLabel")}
+            </span>
             <input
               value={name}
               onChange={(event) => setName(event.target.value)}
@@ -323,7 +341,9 @@ export default function RemotesPanel() {
             />
           </label>
           <label className="min-w-0 flex-1">
-            <span className="mb-1 block text-[10px] text-ink-faint">地址</span>
+            <span className="mb-1 block text-[10px] text-ink-faint">
+              {t("settings.remotes.urlLabel")}
+            </span>
             <input
               value={url}
               onChange={(event) => setUrl(event.target.value)}
@@ -343,7 +363,7 @@ export default function RemotesPanel() {
             className="mt-[18px] inline-flex shrink-0 items-center gap-1 rounded-lg bg-accent px-2.5 py-1.5 text-[11.5px] font-medium text-white transition-opacity hover:opacity-90 disabled:cursor-default disabled:opacity-45"
           >
             {busy ? <Loader2 size={11} className="animate-spin" /> : <Check size={11} />}
-            添加
+            {t("settings.remotes.add")}
           </button>
         </div>
 
@@ -357,11 +377,12 @@ export default function RemotesPanel() {
 
       <ConfirmDialog
         open={pendingRemove !== null}
-        title={`删除远程仓库 ${pendingRemove?.name ?? ""}？`}
-        description={`会同时删除 refs/remotes/${pendingRemove?.name ?? ""}/* 下 ${
-          pendingRemove?.trackingBranches ?? 0
-        } 个跟踪分支；本地分支与服务器不受影响，原跟踪它的分支需重新指定远程。`}
-        confirmLabel="删除远程仓库"
+        title={t("settings.remotes.removeTitle", { name: pendingRemove?.name ?? "" })}
+        description={t("settings.remotes.removeDescription", {
+          name: pendingRemove?.name ?? "",
+          count: pendingRemove?.trackingBranches ?? 0,
+        })}
+        confirmLabel={t("settings.remotes.removeConfirm")}
         tone="danger"
         onConfirm={() => {
           if (pendingRemove) void confirmRemove(pendingRemove);

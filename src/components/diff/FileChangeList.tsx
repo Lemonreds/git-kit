@@ -1,3 +1,4 @@
+import { useT } from "../../i18n";
 import { baseName, dirName, statusMeta } from "../../lib/format";
 import type { FileChange } from "../../lib/types";
 import { tip } from "../common/Tooltip";
@@ -17,6 +18,7 @@ interface FileChangeListProps {
 }
 
 export default function FileChangeList({ files, selectedPath, onSelect }: FileChangeListProps) {
+  const t = useT();
   return (
     <ul className="py-1">
       {files.map((file) => {
@@ -57,7 +59,7 @@ export default function FileChangeList({ files, selectedPath, onSelect }: FileCh
               </span>
 
               {file.isBinary ? (
-                <span className="shrink-0 text-[9.5px] text-ink-faint">二进制</span>
+                <span className="shrink-0 text-[9.5px] text-ink-faint">{t("diff.binaryBadge")}</span>
               ) : (
                 <span className="flex shrink-0 items-center gap-1.5 font-mono text-[9.5px]">
                   <span className={file.additions ? "text-positive" : "text-ink-faint"}>

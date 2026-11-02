@@ -6,7 +6,9 @@ import { createChangesSlice, type ChangesSlice } from "./slices/changesSlice";
 import { createCommitsSlice, type CommitsSlice } from "./slices/commitsSlice";
 import { createDiffSlice, type DiffSlice } from "./slices/diffSlice";
 import { createProjectSlice, type ProjectSlice } from "./slices/projectSlice";
+import { createPrefsSlice, type PrefsSlice } from "./slices/prefsSlice";
 import { createSettingsSlice, type SettingsSlice } from "./slices/settingsSlice";
+import { createTerminalSlice, type TerminalSlice } from "./slices/terminalSlice";
 import { createUiSlice, type UiSlice } from "./slices/uiSlice";
 import { createWorkflowSlice, type WorkflowSlice } from "./slices/workflowSlice";
 
@@ -23,6 +25,8 @@ export type * from "./types";
  * - `changesSlice`   worktree status and staging
  * - `workflowSlice`  repo operation state, stash, tags, reflog, reset
  * - `settingsSlice`  branch templates, settings dialog, commit identity
+ * - `prefsSlice`     app-wide appearance (theme)
+ * - `terminalSlice`  built-in terminal tabs, panel height, LRU ceiling
  * - `uiSlice`        toast + alert
  *
  * Components keep subscribing field-by-field (`useAppStore((state) => state.branches)`),
@@ -37,6 +41,8 @@ export type AppState = ProjectSlice &
   ChangesSlice &
   WorkflowSlice &
   SettingsSlice &
+  PrefsSlice &
+  TerminalSlice &
   UiSlice;
 
 export const useAppStore = create<AppState>()((...args) => ({
@@ -48,5 +54,7 @@ export const useAppStore = create<AppState>()((...args) => ({
   ...createChangesSlice(...args),
   ...createWorkflowSlice(...args),
   ...createSettingsSlice(...args),
+  ...createPrefsSlice(...args),
+  ...createTerminalSlice(...args),
   ...createUiSlice(...args),
 }));

@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Archive, ArrowUpFromLine, Check, Loader2, Trash2 } from "lucide-react";
 
+import { useT } from "../../i18n";
 import { useAppStore } from "../../store/appStore";
 import ConfirmDialog from "../common/ConfirmDialog";
 import Modal from "../common/Modal";
@@ -10,6 +11,7 @@ interface StashDialogProps {
 }
 
 export default function StashDialog({ onClose }: StashDialogProps) {
+  const t = useT();
   const stashEntries = useAppStore((state) => state.stashEntries);
   const refreshStashes = useAppStore((state) => state.refreshStashes);
   const stashPush = useAppStore((state) => state.stashPush);
@@ -52,8 +54,8 @@ export default function StashDialog({ onClose }: StashDialogProps) {
     <>
       <Modal
         open
-        title="暂存改动（stash）"
-        subtitle="切分支或拉取前，可以把当前改动先收起来"
+        title={t("changes.stashLabel")}
+        subtitle={t("changes.stashSubtitle")}
         onClose={busy !== null ? () => undefined : onClose}
         width={520}
         footer={
@@ -62,7 +64,7 @@ export default function StashDialog({ onClose }: StashDialogProps) {
             onClick={onClose}
             className="rounded-lg border border-line px-3 py-1.5 text-[12px] font-medium text-ink-soft transition-colors hover:bg-ink/5 hover:text-ink"
           >
-            关闭
+            {t("changes.close")}
           </button>
         }
       >
@@ -75,7 +77,7 @@ export default function StashDialog({ onClose }: StashDialogProps) {
                 onKeyDown={(event) => {
                   if (event.key === "Enter") void push();
                 }}
-                placeholder="说明（可选），例如：切分支前的临时改动"
+                placeholder={t("changes.stashMessagePlaceholder")}
                 className="min-w-0 flex-1 rounded-lg border border-line bg-panel px-2.5 py-1.5 text-[12px] text-ink outline-none transition-colors placeholder:text-ink-faint focus:border-accent/60"
               />
               <button
@@ -85,7 +87,7 @@ export default function StashDialog({ onClose }: StashDialogProps) {
                 className="inline-flex shrink-0 items-center gap-1 rounded-lg bg-accent px-2.5 py-1.5 text-[11.5px] font-medium text-white transition-opacity hover:opacity-90 disabled:opacity-45"
               >
                 {busy === "push" ? <Loader2 size={11} className="animate-spin" /> : <Archive size={11} />}
-                暂存当前改动
+                {t("changes.stashCreate")}
               </button>
             </div>
             <label className="mt-2 flex cursor-pointer items-center gap-1.5 text-[10.5px] text-ink-faint">
@@ -102,20 +104,20 @@ export default function StashDialog({ onClose }: StashDialogProps) {
                 onChange={() => setIncludeUntracked((value) => !value)}
                 className="sr-only"
               />
-              同时包含未跟踪文件（-u）
+              {t("changes.stashIncludeUntracked")}
             </label>
           </div>
 
           <div>
             <p className="mb-1 flex items-center justify-between text-[11.5px] font-medium text-ink-soft">
-              已有 stash
+              {t("changes.stashExisting")}
               <span className="font-normal text-[10.5px] text-ink-faint">
-                {stashEntries.length} 条
+                {t("changes.stashCount", { count: stashEntries.length })}
               </span>
             </p>
             {stashEntries.length === 0 ? (
               <p className="rounded-lg border border-dashed border-line px-3 py-3 text-center text-[11px] text-ink-faint">
-                还没有 stash
+                {t("changes.stashEmpty")}
               </p>
             ) : (
               <div className="max-h-[220px] overflow-y-auto rounded-lg border border-line">
@@ -128,13 +130,13 @@ export default function StashDialog({ onClose }: StashDialogProps) {
                       {entry.selector}
                     </code>
                     <span className="min-w-0 flex-1 truncate text-[11.5px] text-ink">
-                      {entry.message || "（无说明）"}
+                      {entry.message || t("changes.stashNoMessage")}
                     </span>
                     <button
                       type="button"
                       onClick={() => void pop(entry.index)}
                       disabled={busy !== null}
-                      title="恢复并删除该条 stash"
+                      title={t("changes.stashPopTitle")}
                       className="inline-flex shrink-0 items-center gap-1 rounded-md border border-line px-1.5 py-0.5 text-[10.5px] text-ink-soft transition-colors hover:border-accent/40 hover:text-accent disabled:opacity-40"
                     >
                       {busy === entry.index ? (
@@ -142,13 +144,13 @@ export default function StashDialog({ onClose }: StashDialogProps) {
                       ) : (
                         <ArrowUpFromLine size={10} />
                       )}
-                      恢复
+                      {t("changes.stashPop")}
                     </button>
                     <button
                       type="button"
                       onClick={() => setPendingDrop(entry.index)}
                       disabled={busy !== null}
-                      aria-label="删除该条 stash"
+                      aria-label={t("changes.stashDrop")}
                       className="grid h-5 w-5 shrink-0 place-items-center rounded text-ink-faint transition-colors hover:bg-negative/10 hover:text-negative disabled:opacity-40"
                     >
                       <Trash2 size={11} />
@@ -166,23 +168,23 @@ export default function StashDialog({ onClose }: StashDialogProps) {
           ) : null}
 
           <p className="text-[10.5px] leading-relaxed text-ink-faint">
-            恢复冲突时 stash 不会被删除，解决冲突后可手动 drop。
+            {t("changes.stashConflictHint")}
           </p>
         </div>
       </Modal>
 
       <ConfirmDialog
         open={pendingDrop !== null}
-        title="删除这条 stash？"
-        description="stash 里的改动会被永久丢弃，且不可撤销。"
-        confirmLabel="删除"
+        title={t("changes.stashDropTitle")}
+        description={t("changes.stashDropDescription")}
+        confirmLabel={t("changes.delete")}
         tone="danger"
         onConfirm={() => {
           const index = pendingDrop;
           setPendingDrop(null);
           if (index !== null) {
             void stashDrop(index).then((ok) => {
-              if (!ok) notify("error", "删除 stash 失败");
+              if (!ok) notify("error", t("changes.stashDropFailed"));
             });
           }
         }}

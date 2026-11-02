@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Check, Loader2, Sparkles } from "lucide-react";
 
+import { useT } from "../../i18n";
 import {
   DATE_FORMATS,
   checkBranchName,
@@ -16,7 +17,7 @@ import HelpTip from "../common/HelpTip";
 import Modal from "../common/Modal";
 
 interface CreateBranchDialogProps {
-  /** Pre-selected base (used by "基于此远程分支新建"). */
+  /** Pre-selected base (used by "create from this remote branch"). */
   initialBaseRef?: string;
   onClose: () => void;
 }
@@ -39,6 +40,7 @@ function pickDefaultBase(branches: BranchSummary[]): string {
 }
 
 export default function CreateBranchDialog({ initialBaseRef, onClose }: CreateBranchDialogProps) {
+  const t = useT();
   const branches = useAppStore((state) => state.branches);
   const remoteBranches = useAppStore((state) => state.remoteBranches);
   const templates = useAppStore((state) => state.templates);
@@ -112,8 +114,8 @@ export default function CreateBranchDialog({ initialBaseRef, onClose }: CreateBr
   return (
     <Modal
       open
-      title="新建分支"
-      subtitle="从所选起点创建本地分支，可选择是否切换过去"
+      title={t("branches.newBranch")}
+      subtitle={t("branches.createSubtitle")}
       onClose={busy !== null ? () => undefined : onClose}
       width={560}
       footer={
@@ -124,7 +126,7 @@ export default function CreateBranchDialog({ initialBaseRef, onClose }: CreateBr
             disabled={busy !== null}
             className="rounded-lg border border-line px-3 py-1.5 text-[12px] font-medium text-ink-soft transition-colors hover:bg-ink/5 hover:text-ink disabled:opacity-50"
           >
-            取消
+            {t("branches.cancel")}
           </button>
           <button
             type="button"
@@ -133,7 +135,7 @@ export default function CreateBranchDialog({ initialBaseRef, onClose }: CreateBr
             className="inline-flex items-center gap-1.5 rounded-lg border border-accent/45 px-3 py-1.5 text-[12px] font-medium text-accent transition-colors hover:bg-accent-soft disabled:cursor-default disabled:opacity-45"
           >
             {busy === "create" ? <Loader2 size={12} className="animate-spin" /> : null}
-            仅新建
+            {t("branches.createOnly")}
           </button>
           <button
             type="button"
@@ -142,7 +144,7 @@ export default function CreateBranchDialog({ initialBaseRef, onClose }: CreateBr
             className="inline-flex items-center gap-1.5 rounded-lg bg-accent px-3 py-1.5 text-[12px] font-medium text-white transition-opacity hover:opacity-90 disabled:cursor-default disabled:opacity-45"
           >
             {busy === "checkout" ? <Loader2 size={12} className="animate-spin" /> : null}
-            新建并切换
+            {t("branches.createAndCheckout")}
           </button>
         </>
       }
@@ -150,8 +152,8 @@ export default function CreateBranchDialog({ initialBaseRef, onClose }: CreateBr
       <div className="space-y-3.5">
         <div>
           <p className="mb-1 flex items-center gap-1 text-[11.5px] font-medium text-ink-soft">
-            分支名模板
-            <HelpTip label="在右上角「设置 → 分支名模板」中管理模板；规则里的 {date} 会替换成下方所选日期。" />
+            {t("branches.templateLabel")}
+            <HelpTip label={t("branches.templateHint")} />
           </p>
           <div className="flex flex-wrap gap-1">
             {templates.map((item) => (
@@ -167,7 +169,9 @@ export default function CreateBranchDialog({ initialBaseRef, onClose }: CreateBr
               >
                 {item.name}
                 {item.id === defaultTemplateId ? (
-                  <span className="rounded bg-accent/12 px-1 text-[9px] text-accent">默认</span>
+                  <span className="rounded bg-accent/12 px-1 text-[9px] text-accent">
+                    {t("branches.defaultTag")}
+                  </span>
                 ) : null}
               </button>
             ))}
@@ -180,7 +184,7 @@ export default function CreateBranchDialog({ initialBaseRef, onClose }: CreateBr
                   : "border-line text-ink-soft hover:bg-ink/5"
               }`}
             >
-              自定义
+              {t("branches.custom")}
             </button>
           </div>
         </div>
@@ -188,9 +192,12 @@ export default function CreateBranchDialog({ initialBaseRef, onClose }: CreateBr
         {showDates ? (
           <div>
             <p className="mb-1 flex items-center justify-between text-[11.5px] font-medium text-ink-soft">
-              选择日期
+              {t("branches.pickDate")}
               <span className="font-normal text-[10.5px] text-ink-faint">
-                格式 {DATE_FORMATS.find((option) => option.value === dateFormat)?.label ?? dateFormat}
+                {t("branches.dateFormat", {
+                  format:
+                    DATE_FORMATS.find((option) => option.value === dateFormat)?.label ?? dateFormat,
+                })}
               </span>
             </p>
             <div className="flex flex-wrap gap-1">
@@ -227,7 +234,7 @@ export default function CreateBranchDialog({ initialBaseRef, onClose }: CreateBr
 
         <label className="block">
           <span className="mb-1 flex items-center gap-1 text-[11.5px] font-medium text-ink-soft">
-            分支名
+            {t("branches.branchName")}
           </span>
           <input
             value={name}
@@ -239,11 +246,13 @@ export default function CreateBranchDialog({ initialBaseRef, onClose }: CreateBr
           {trimmed ? (
             <span className="mt-1 flex items-start gap-1 text-[10.5px] leading-relaxed">
               {duplicate ? (
-                <span className="text-negative">本地分支 {trimmed} 已存在</span>
+                <span className="text-negative">
+                  {t("branches.duplicateName", { name: trimmed })}
+                </span>
               ) : check.valid ? (
                 <span className="flex items-center gap-1 text-positive">
                   <Check size={10.5} />
-                  分支名可用
+                  {t("branches.nameAvailable")}
                 </span>
               ) : (
                 <span className="text-negative">{check.reason}</span>
@@ -254,18 +263,20 @@ export default function CreateBranchDialog({ initialBaseRef, onClose }: CreateBr
 
         <div>
           <p className="mb-1 flex items-center gap-1 text-[11.5px] font-medium text-ink-soft">
-            起点分支
-            <HelpTip label="默认从主分支（master / main）创建；远程分支会自动设置为上游，首次推送即推到同名远程分支。" />
+            {t("branches.baseBranch")}
+            <HelpTip label={t("branches.baseHint")} />
           </p>
           <BaseBranchPicker
             branches={allBranches}
             value={baseRef}
             onChange={setBaseRef}
-            placeholder={baseBranch ? baseBranch.name : "搜索分支"}
+            placeholder={baseBranch ? baseBranch.name : t("branches.searchBranches")}
           />
           {baseBranch?.isRemote ? (
             <p className="mt-1 text-[10.5px] text-ink-faint">
-              新分支会跟踪 <code className="font-mono">{baseBranch.name}</code>，推送时默认推到该远程分支。
+              {t("branches.tracksRemotePrefix")}
+              <code className="font-mono">{baseBranch.name}</code>
+              {t("branches.tracksRemoteSuffix")}
             </p>
           ) : null}
         </div>
@@ -273,12 +284,14 @@ export default function CreateBranchDialog({ initialBaseRef, onClose }: CreateBr
         <div className="rounded-lg border border-line bg-canvas/50 px-3 py-2">
           <p className="flex items-center gap-1 text-[10.5px] text-ink-faint">
             <Sparkles size={10.5} />
-            将创建
+            {t("branches.willCreate")}
           </p>
           <p className="mt-0.5 break-all font-mono text-[12px] font-medium text-ink">
             {trimmed || "—"}
             <span className="ml-1.5 font-sans text-[10.5px] font-normal text-ink-faint">
-              基于 {baseBranch?.name ?? "未选择"}
+              {t("branches.basedOn", {
+                name: baseBranch?.name ?? t("branches.notSelected"),
+              })}
             </span>
           </p>
         </div>

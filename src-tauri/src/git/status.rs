@@ -209,8 +209,23 @@ pub fn stage_all(repo: &Repository) -> Result<(), AppError> {
 pub fn unstage_all(repo: &Repository) -> Result<(), AppError> {
     match head_object(repo) {
         Ok(target) => {
-            let paths: [&Path; 0] = [];
-            repo.reset_default(Some(&target), paths)?;
+            // libgit2 rejects an empty pathspec list (`invalid argument`), so the
+            // index is restored path by path from the HEAD tree. Files that are
+            // not tracked in HEAD lose their index entry and stay untracked.
+            let tree = target.peel_to_tree()?;
+            let mut index = repo.index()?;
+            let paths: Vec<Vec<u8>> = index.iter().map(|entry| entry.path.clone()).collect();
+            for path in paths {
+                let relative = Path::new(std::str::from_utf8(&path).map_err(|_| {
+                    AppError::message("仓库中存在无法识别的文件路径")
+                })?);
+                if tree.get_path(relative).is_ok() {
+                    repo.reset_default(Some(&target), [relative])?;
+                } else {
+                    index.remove_path(relative)?;
+                }
+            }
+            index.write()?;
         }
         Err(_) => {
             let mut index = repo.index()?;

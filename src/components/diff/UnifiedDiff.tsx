@@ -1,5 +1,6 @@
 import { Fragment } from "react";
 
+import { useT } from "../../i18n";
 import type { DiffLine, UnifiedRow } from "../../lib/parsePatch";
 import DiffText from "./DiffText";
 
@@ -35,10 +36,11 @@ export default function UnifiedDiff({
   limit: number;
   query?: string;
 }) {
+  const t = useT();
   if (rows.length === 0) {
     return (
       <p className="px-4 py-6 text-[12px] text-ink-faint">
-        没有可显示的行级改动（可能是文件模式、权限或空行变化）。
+        {t("diff.noLineChanges")}
       </p>
     );
   }

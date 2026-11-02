@@ -1,6 +1,7 @@
 import { open } from "@tauri-apps/plugin-dialog";
 import type { StateCreator } from "zustand";
 
+import { t } from "../../i18n";
 import { api } from "../../lib/ipc";
 import type { ProjectSort } from "../../lib/sortProjects";
 import type { Project } from "../../lib/types";
@@ -136,16 +137,16 @@ export const createProjectSlice: StateCreator<AppState, [], [], ProjectSlice> = 
         const selected = await open({
           directory: true,
           multiple: false,
-          title: "选择 Git 仓库文件夹",
+          title: t("store.chooseRepoFolder"),
         });
         if (typeof selected !== "string") return;
 
         const project = await api.addProject(selected);
         set((state) => ({ projects: upsertProject(state.projects, project) }));
         await get().loadProject(project);
-        notify("success", `已添加 ${project.name}`);
+        notify("success", t("store.projectAdded", { name: project.name }));
       } catch (error) {
-        fail("添加项目失败", error);
+        fail(t("store.addProjectFailed"), error);
       }
     },
 
@@ -156,22 +157,25 @@ export const createProjectSlice: StateCreator<AppState, [], [], ProjectSlice> = 
         const selected = await open({
           directory: true,
           multiple: false,
-          title: `重新选择「${project.name}」所在文件夹`,
+          title: t("store.relinkFolderTitle", { name: project.name }),
         });
         if (typeof selected !== "string") return;
 
         const next = await api.relinkProject(id, selected);
+        // The shell sits in the old working directory, which may no longer exist.
+        get().closeProjectTerminals(id);
         set((state) => ({ projects: upsertProject(state.projects, next) }));
         await get().loadProject(next);
-        notify("success", "项目路径已更新");
+        notify("success", t("store.projectPathUpdated"));
       } catch (error) {
-        fail("更新项目路径失败", error);
+        fail(t("store.relinkFailed"), error);
       }
     },
 
     async removeProject(id) {
       try {
         await api.removeProject(id);
+        get().closeProjectTerminals(id);
         const remaining = get().projects.filter((project) => project.id !== id);
         const wasActive = get().activeProject?.id === id;
         set({ projects: remaining });
@@ -197,7 +201,7 @@ export const createProjectSlice: StateCreator<AppState, [], [], ProjectSlice> = 
         });
         if (next) await get().loadProject(next);
       } catch (error) {
-        fail("移除项目失败", error);
+        fail(t("store.removeProjectFailed"), error);
       }
     },
 
@@ -218,7 +222,7 @@ export const createProjectSlice: StateCreator<AppState, [], [], ProjectSlice> = 
         }));
       } catch (error) {
         set({ projects: previous });
-        fail(pinned ? "置顶项目失败" : "取消置顶失败", error);
+        fail(t(pinned ? "store.pinFailed" : "store.unpinFailed"), error);
       }
     },
 
@@ -236,9 +240,9 @@ export const createProjectSlice: StateCreator<AppState, [], [], ProjectSlice> = 
         set({ projects: list.projects, activeProject: null });
         if (active) await get().loadProject(active);
         if (get().pane === "changes") await get().refreshChanges();
-        notify("info", "已刷新");
+        notify("info", t("store.refreshed"));
       } catch (error) {
-        fail("刷新失败", error);
+        fail(t("store.refreshFailed"), error);
       }
     },
   };

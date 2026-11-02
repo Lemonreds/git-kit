@@ -1,6 +1,11 @@
 @import "tailwindcss";
 
-:root {
+/* Light is the default. The same block is reused by any subtree carrying
+   `data-theme="light"`, which is how the settings preview renders a faithful
+   miniature of the real palette instead of a hand-painted approximation. */
+:root,
+[data-theme="light"] {
+  color-scheme: light;
   --gk-canvas: #eef0f3;
   --gk-sidebar: rgba(247, 247, 249, 0.9);
   --gk-panel: #ffffff;
@@ -24,30 +29,32 @@
   --gk-shadow: 0 1px 2px rgba(16, 24, 40, 0.06), 0 12px 32px rgba(16, 24, 40, 0.08);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --gk-canvas: #151517;
-    --gk-sidebar: rgba(28, 28, 31, 0.92);
-    --gk-panel: #1c1c1f;
-    --gk-raised: #242428;
-    --gk-line: #2f2f34;
-    --gk-line-strong: #3e3e45;
-    --gk-ink: #f2f2f4;
-    --gk-ink-soft: #a5a7af;
-    --gk-ink-faint: #7b7d86;
-    --gk-accent: #5a94ff;
-    --gk-accent-soft: rgba(90, 148, 255, 0.16);
-    --gk-positive: #45c96b;
-    --gk-negative: #ff6f66;
-    --gk-warning: #e0a75a;
-    --gk-diff-add: rgba(63, 185, 80, 0.15);
-    --gk-diff-add-strong: rgba(63, 185, 80, 0.28);
-    --gk-diff-del: rgba(248, 81, 73, 0.13);
-    --gk-diff-del-strong: rgba(248, 81, 73, 0.26);
-    --gk-diff-hunk: rgba(90, 148, 255, 0.1);
-    --gk-gutter: #202024;
-    --gk-shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 16px 40px rgba(0, 0, 0, 0.35);
-  }
+/* Declared after `:root` so it wins on equal specificity. No `:root` prefix on
+   purpose: a preview card can carry `data-theme="dark"` inside a light window
+   and get the real dark tokens for its subtree. */
+[data-theme="dark"] {
+  color-scheme: dark;
+  --gk-canvas: #151517;
+  --gk-sidebar: rgba(28, 28, 31, 0.92);
+  --gk-panel: #1c1c1f;
+  --gk-raised: #242428;
+  --gk-line: #2f2f34;
+  --gk-line-strong: #3e3e45;
+  --gk-ink: #f2f2f4;
+  --gk-ink-soft: #a5a7af;
+  --gk-ink-faint: #7b7d86;
+  --gk-accent: #5a94ff;
+  --gk-accent-soft: rgba(90, 148, 255, 0.16);
+  --gk-positive: #45c96b;
+  --gk-negative: #ff6f66;
+  --gk-warning: #e0a75a;
+  --gk-diff-add: rgba(63, 185, 80, 0.15);
+  --gk-diff-add-strong: rgba(63, 185, 80, 0.28);
+  --gk-diff-del: rgba(248, 81, 73, 0.13);
+  --gk-diff-del-strong: rgba(248, 81, 73, 0.26);
+  --gk-diff-hunk: rgba(90, 148, 255, 0.1);
+  --gk-gutter: #202024;
+  --gk-shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 16px 40px rgba(0, 0, 0, 0.35);
 }
 
 @theme inline {
@@ -209,6 +216,16 @@
     padding: 0;
   }
 
+  /* Built-in terminal (xterm.js). xterm paints its own background from the
+     theme, so the viewport only has to stay out of the way of the panel. */
+  .xterm {
+    height: 100%;
+  }
+
+  .xterm .xterm-viewport {
+    background-color: transparent !important;
+  }
+
   mark.diff-hit[data-active="true"] {
     background: color-mix(in srgb, var(--gk-warning) 58%, transparent);
     box-shadow: 0 0 0 1px color-mix(in srgb, var(--gk-warning) 55%, transparent);
@@ -292,9 +309,9 @@
   }
 }
 
-@media (prefers-color-scheme: dark) {
-  .avatar {
-    background: color-mix(in srgb, hsl(var(--avatar-hue) 66% 62%) 22%, transparent);
-    color: color-mix(in srgb, hsl(var(--avatar-hue) 72% 76%) 85%, var(--gk-ink));
-  }
+/* Follows the app's own theme, not the OS one: picking dark in settings while
+   macOS stays light must also retint the commit avatars. */
+[data-theme="dark"] .avatar {
+  background: color-mix(in srgb, hsl(var(--avatar-hue) 66% 62%) 22%, transparent);
+  color: color-mix(in srgb, hsl(var(--avatar-hue) 72% 76%) 85%, var(--gk-ink));
 }

@@ -28,6 +28,9 @@ chrono = { version = "0.4", default-features = false, features = ["clock"] }
 uuid = { version = "1", features = ["v4"] }
 # Local-repository only: skip libgit2's https/ssh stack to keep the build light.
 git2 = { version = "0.20", default-features = false }
+# Pseudo terminals for the built-in terminal: openpty on macOS/Linux, ConPTY on
+# Windows (needs Windows 10 1809+). One API for every target.
+portable-pty = "0.9"
 
 
 # Read the optimization guideline for more details: https://tauri.app/concept/size/#cargo-configuration

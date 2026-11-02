@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { History } from "lucide-react";
 
+import { useT } from "../../i18n";
 import { relativeTime } from "../../lib/format";
 import type { ReflogEntry } from "../../lib/types";
 import { useAppStore } from "../../store/appStore";
@@ -15,6 +16,7 @@ interface ReflogDialogProps {
 type Pending = { entry: ReflogEntry; hard: boolean };
 
 export default function ReflogDialog({ onClose }: ReflogDialogProps) {
+  const t = useT();
   const reflog = useAppStore((state) => state.reflog);
   const refreshReflog = useAppStore((state) => state.refreshReflog);
   const resetTo = useAppStore((state) => state.resetTo);
@@ -28,8 +30,8 @@ export default function ReflogDialog({ onClose }: ReflogDialogProps) {
     <>
       <Modal
         open
-        title="操作历史（reflog）"
-        subtitle="误 rebase / reset / squash 后，可以从这里回到任意一次 HEAD"
+        title={t("branches.actionReflog")}
+        subtitle={t("branches.reflogSubtitle")}
         onClose={onClose}
         width={560}
         footer={
@@ -38,13 +40,13 @@ export default function ReflogDialog({ onClose }: ReflogDialogProps) {
             onClick={onClose}
             className="rounded-lg border border-line px-3 py-1.5 text-[12px] font-medium text-ink-soft transition-colors hover:bg-ink/5 hover:text-ink"
           >
-            关闭
+            {t("branches.close")}
           </button>
         }
       >
         {reflog.length === 0 ? (
           <p className="rounded-lg border border-dashed border-line px-3 py-4 text-center text-[11px] text-ink-faint">
-            没有操作记录
+            {t("branches.noReflog")}
           </p>
         ) : (
           <div className="max-h-[340px] overflow-y-auto rounded-lg border border-line">
@@ -73,14 +75,14 @@ export default function ReflogDialog({ onClose }: ReflogDialogProps) {
                   onClick={() => setPending({ entry, hard: false })}
                   className="shrink-0 rounded-md border border-line px-1.5 py-0.5 text-[10.5px] text-ink-soft transition-colors hover:border-accent/40 hover:text-accent"
                 >
-                  回到这里
+                  {t("branches.reflogGoBack")}
                 </button>
                 <button
                   type="button"
                   onClick={() => setPending({ entry, hard: true })}
                   className="shrink-0 rounded-md border border-negative/35 px-1.5 py-0.5 text-[10.5px] text-negative transition-colors hover:bg-negative/8"
                 >
-                  强制重置
+                  {t("branches.reflogHardReset")}
                 </button>
               </div>
             ))}
@@ -88,11 +90,13 @@ export default function ReflogDialog({ onClose }: ReflogDialogProps) {
         )}
 
         <p className="mt-2 text-[10.5px] leading-relaxed text-ink-faint">
-          「回到这里」使用 <code className="font-mono">reset --mixed</code>
-          ，会保留当前文件内容为未提交改动；
+          {t("branches.reflogMixedPrefix")}
+          <code className="font-mono">reset --mixed</code>
+          {t("branches.reflogMixedSuffix")}
           <br />
-          「强制重置」使用 <code className="font-mono">reset --hard</code>
-          ，工作区改动会被丢弃。如果分支已经推送过，重置后需要强制推送。
+          {t("branches.reflogHardPrefix")}
+          <code className="font-mono">reset --hard</code>
+          {t("branches.reflogHardSuffix")}
         </p>
       </Modal>
 
@@ -100,15 +104,17 @@ export default function ReflogDialog({ onClose }: ReflogDialogProps) {
         open={pending !== null}
         title={
           pending?.hard
-            ? `强制重置到 ${pending.entry.shortSha}？`
-            : `回到 ${pending?.entry.shortSha}？`
+            ? t("branches.confirmHardResetTitle", { sha: pending.entry.shortSha })
+            : t("branches.confirmGoBackTitle", { sha: pending?.entry.shortSha ?? "" })
         }
         description={
           pending?.hard
-            ? "当前工作区的未提交改动会被丢弃，且无法撤销。"
-            : "当前 HEAD 会移动到该提交，文件内容保留为未提交改动。"
+            ? t("branches.confirmHardResetBody")
+            : t("branches.confirmGoBackBody")
         }
-        confirmLabel={pending?.hard ? "强制重置" : "回到这里"}
+        confirmLabel={
+          pending?.hard ? t("branches.reflogHardReset") : t("branches.reflogGoBack")
+        }
         tone={pending?.hard ? "danger" : "default"}
         onConfirm={() => {
           const target = pending;

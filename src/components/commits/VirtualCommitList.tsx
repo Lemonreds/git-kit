@@ -3,6 +3,7 @@ import { useMemo } from "react";
 import { List, useDynamicRowHeight } from "react-window";
 import type { RowComponentProps } from "react-window";
 
+import { useT } from "../../i18n";
 import type { CommitSummary } from "../../lib/types";
 import CommitRow from "./CommitRow";
 
@@ -26,6 +27,7 @@ function CommitListRow({
   selectCommit,
   loadMore,
 }: RowComponentProps<RowProps>) {
+  const t = useT();
   if (index >= commits.length) {
     return (
       <div style={style} className="pt-2">
@@ -38,10 +40,10 @@ function CommitListRow({
           {loading ? (
             <>
               <Loader2 size={12} className="animate-spin" />
-              加载中
+              {t("commits.loading")}
             </>
           ) : (
-            "加载更多提交"
+            t("commits.loadMore")
           )}
         </button>
       </div>
@@ -72,7 +74,7 @@ interface VirtualCommitListProps {
 }
 
 /**
- * Virtualised commit history: "加载更多" can grow the list to thousands of rows,
+ * Virtualised commit history: "load more" can grow the list to thousands of rows,
  * but only the visible ones are mounted.
  */
 export default function VirtualCommitList({

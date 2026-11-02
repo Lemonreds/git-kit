@@ -1,5 +1,6 @@
 import type { StateCreator } from "zustand";
 
+import { t } from "../../i18n";
 import { api, IpcError } from "../../lib/ipc";
 import type { AppState } from "../appStore";
 import { errorMessage, feedback, invalidateCaches } from "../shared";
@@ -36,10 +37,13 @@ export const createBranchOpsSlice: StateCreator<AppState, [], [], BranchOpsSlice
         await get().refreshChanges();
         const viewed = get().selectedBranch;
         if (viewed?.name === branch) await get().openBranch(viewed.refName);
-        notify("success", `已把 ${result.squashed} 个提交压缩为 ${result.shortSha}`);
+        notify(
+          "success",
+          t("store.squashed", { count: result.squashed, sha: result.shortSha }),
+        );
         return true;
       } catch (error) {
-        fail("压缩提交失败", error);
+        fail(t("store.squashFailed"), error);
         await get().refreshBranches();
         return false;
       }
@@ -55,10 +59,13 @@ export const createBranchOpsSlice: StateCreator<AppState, [], [], BranchOpsSlice
         await get().refreshChanges();
         const target = get().branches.find((branch) => branch.name === result.targetBranch);
         if (target) await get().openBranch(target.refName);
-        notify("success", `已 cherry-pick ${result.picked.length} 个提交到 ${result.targetBranch}`);
+        notify(
+          "success",
+          t("store.cherryPicked", { count: result.picked.length, branch: result.targetBranch }),
+        );
         return true;
       } catch (error) {
-        fail("cherry-pick 失败", error);
+        fail(t("store.cherryPickFailed"), error);
         await get().refreshBranches();
         await get().refreshChanges();
         return false;
@@ -71,14 +78,20 @@ export const createBranchOpsSlice: StateCreator<AppState, [], [], BranchOpsSlice
       try {
         const result = await api.pushBranch(project.path, branch, force);
         await get().refreshBranches();
-        notify("success", `${result.forced ? "强制推送" : "推送"} ${branch} → ${result.remote} 完成`);
+        notify(
+          "success",
+          t(result.forced ? "store.forcePushed" : "store.pushed", {
+            branch,
+            remote: result.remote,
+          }),
+        );
         return { ok: true };
       } catch (error) {
         const code = error instanceof IpcError ? error.code : "unknown";
         const message = errorMessage(error);
         // `push_rejected` is expected during the dialog flow: the dialog turns it
-        // into the “需要强制推送” step instead of a bare error toast.
-        if (code !== "push_rejected") fail("推送失败", error);
+        // into the force-push step instead of a bare error toast.
+        if (code !== "push_rejected") fail(t("store.pushFailed"), error);
         await get().refreshBranches();
         return { ok: false, code, message };
       }
@@ -93,23 +106,44 @@ export const createBranchOpsSlice: StateCreator<AppState, [], [], BranchOpsSlice
         set({ worktreeTarget: null, diff: null, selectedFilePath: null });
         await get().refreshChanges();
         await get().refreshBranches();
-        const moved = result.switched && result.previousBranch
-          ? `（已从 ${result.previousBranch} 切换）`
-          : "";
+        const previous = result.switched ? (result.previousBranch ?? null) : null;
         if (result.strategy === "up-to-date") {
-          notify("info", `${branch} 已是最新，没有需要拉取的提交${moved}`);
-        } else {
           notify(
-            "success",
-            `${result.strategy === "merge" ? "已合并" : "已快进拉取"} ${result.incoming} 个远程提交 · ${branch}${moved}`,
+            "info",
+            previous
+              ? t("store.pullUpToDateSwitched", { branch, previous })
+              : t("store.pullUpToDate", { branch }),
           );
+        } else {
+          const count = result.incoming;
+          if (previous) {
+            notify(
+              "success",
+              t(
+                result.strategy === "merge"
+                  ? "store.pullMergedSwitched"
+                  : "store.pullFastForwardedSwitched",
+                { branch, count, previous },
+              ),
+            );
+          } else {
+            notify(
+              "success",
+              t(
+                result.strategy === "merge"
+                  ? "store.pullMerged"
+                  : "store.pullFastForwarded",
+                { branch, count },
+              ),
+            );
+          }
         }
         return { ok: true };
       } catch (error) {
         const code = error instanceof IpcError ? error.code : "unknown";
         const message = errorMessage(error);
         // `pull_conflict` is surfaced inside the dialog with the conflict list.
-        if (code !== "pull_conflict") fail("拉取失败", error);
+        if (code !== "pull_conflict") fail(t("store.pullFailed"), error);
         await get().refreshBranches();
         await get().refreshChanges();
         return { ok: false, code, message };
@@ -133,14 +167,18 @@ export const createBranchOpsSlice: StateCreator<AppState, [], [], BranchOpsSlice
         }
         notify(
           "success",
-          `已把 ${result.replayed} 个提交 rebase 到 ${result.base} · ${result.newHead}`,
+          t("store.rebased", {
+            count: result.replayed,
+            base: result.base,
+            head: result.newHead,
+          }),
         );
         return { ok: true, result };
       } catch (error) {
         const code = error instanceof IpcError ? error.code : "unknown";
         const message = errorMessage(error);
         // `rebase_conflict` is surfaced inside the dialog with the file list.
-        if (code !== "rebase_conflict") fail("rebase 失败", error);
+        if (code !== "rebase_conflict") fail(t("store.rebaseFailed"), error);
         await get().refreshBranches();
         await get().refreshChanges();
         return { ok: false, code, message };
@@ -153,14 +191,19 @@ export const createBranchOpsSlice: StateCreator<AppState, [], [], BranchOpsSlice
       try {
         const result = await api.syncBranch(project.path, branch);
         await get().refreshBranches();
-        const delta =
+        notify(
+          "success",
           result.ahead !== null && result.behind !== null
-            ? ` · 领先 ${result.ahead}，落后 ${result.behind}`
-            : "";
-        notify("success", `已同步 ${branch} 的远程提交${delta}`);
+            ? t("store.syncedWithDelta", {
+                branch,
+                ahead: result.ahead,
+                behind: result.behind,
+              })
+            : t("store.synced", { branch }),
+        );
         return true;
       } catch (error) {
-        fail("同步失败", error);
+        fail(t("store.syncFailed"), error);
         return false;
       }
     },
@@ -182,17 +225,17 @@ export const createBranchOpsSlice: StateCreator<AppState, [], [], BranchOpsSlice
           else get().backToBranches();
         }
         await get().refreshRepoState();
-        const names = result.remotes.join("、");
+        const names = result.remotes.join(t("store.listSeparator"));
         const updated = result.output.trim().length > 0;
         notify(
           "success",
           updated
-            ? `已拉取全部远程引用（${names}）· 分支已更新`
-            : `已拉取全部远程引用（${names}）· 已是最新`,
+            ? t("store.fetchedUpdated", { remotes: names })
+            : t("store.fetchedUpToDate", { remotes: names }),
         );
         return true;
       } catch (error) {
-        fail("拉取远程引用失败", error);
+        fail(t("store.fetchFailed"), error);
         return false;
       }
     },

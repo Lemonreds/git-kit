@@ -14,6 +14,7 @@ import {
   Upload,
 } from "lucide-react";
 
+import { useT } from "../../i18n";
 import type { BranchSummary, WorktreeEntry } from "../../lib/types";
 import { useAppStore } from "../../store/appStore";
 import { useSlice } from "../../store/hooks";
@@ -30,6 +31,7 @@ import CommitDialog from "./CommitDialog";
 import StashDialog from "./StashDialog";
 
 export default function ChangesPanel() {
+  const t = useT();
   const {
     changes,
     changesLoading: loading,
@@ -90,20 +92,20 @@ export default function ChangesPanel() {
     : null;
   const pushDisabled = !hasRemote || !currentBranch || detached;
   const pushHint = !hasRemote
-    ? "该仓库没有配置远程地址，无法推送"
+    ? t("changes.pushHintNoRemote")
     : detached
-      ? "游离 HEAD 状态无法推送分支"
+      ? t("changes.pushHintDetached")
       : !currentBranch
-        ? "当前没有可推送的分支"
-        : `推送 ${currentBranch.name} 到远程`;
+        ? t("changes.pushHintNoBranch")
+        : t("changes.pushHintBranch", { branch: currentBranch.name });
   const pullDisabled = pushDisabled;
   const pullHint = !hasRemote
-    ? "该仓库没有配置远程地址，无法拉取"
+    ? t("changes.pullHintNoRemote")
     : detached
-      ? "游离 HEAD 状态无法拉取"
+      ? t("changes.pullHintDetached")
       : !currentBranch
-        ? "当前没有可拉取的分支"
-        : `拉取 ${currentBranch.name} 的远程提交`;
+        ? t("changes.pullHintNoBranch")
+        : t("changes.pullHintBranch", { branch: currentBranch.name });
 
   const toggle = (key: string) =>
     setCollapsed((state) => ({ ...state, [key]: !state[key] }));
@@ -178,8 +180,8 @@ export default function ChangesPanel() {
             disabled={staged.length === 0}
             {...tip(
               staged.length > 0
-                ? `提交已暂存的 ${staged.length} 个文件`
-                : "提交（先暂存文件）",
+                ? t("changes.commitStagedTooltip", { count: staged.length })
+                : t("changes.commitNeedsStaged"),
             )}
             className={`inline-flex items-center gap-1 rounded-md border px-1.5 py-1 text-[11px] font-medium transition-colors disabled:cursor-default disabled:opacity-40 ${
               staged.length > 0
@@ -194,7 +196,7 @@ export default function ChangesPanel() {
               </span>
             ) : null}
           </button>
-          <IconButton label="暂存改动（stash）" onClick={() => setStashOpen(true)}>
+          <IconButton label={t("changes.stashLabel")} onClick={() => setStashOpen(true)}>
             <Archive size={14} />
           </IconButton>
           <IconButton label={pullHint} onClick={() => setPullOpen(true)} disabled={pullDisabled}>
@@ -204,19 +206,11 @@ export default function ChangesPanel() {
             <Upload size={14} />
           </IconButton>
           <IconButton
-            label="刷新改动列表"
+            label={t("changes.refresh")}
             onClick={() => void refreshChanges()}
             disabled={!project || loading}
           >
             <RefreshCw size={14} className={loading ? "animate-spin" : undefined} />
-          </IconButton>
-          <IconButton
-            label="放弃全部改动"
-            tone="danger"
-            onClick={() => setConfirmDiscardAll(true)}
-            disabled={entries.length === 0}
-          >
-            <Trash2 size={14} />
           </IconButton>
         </div>
       </header>
@@ -225,23 +219,23 @@ export default function ChangesPanel() {
         {loading && !changes ? (
           <SkeletonRows rows={6} />
         ) : entries.length === 0 ? (
-          <EmptyState icon={CheckCircle2} title="工作区是干净的" />
+          <EmptyState icon={CheckCircle2} title={t("changes.clean")} />
         ) : (
           <>
             {conflicted.length > 0 ? (
               <div className="mb-2 rounded-lg border border-negative/30 bg-negative/8 px-2 py-1.5 text-[11px] text-negative">
-                存在 {conflicted.length} 个冲突文件，解决后暂存即可继续操作
+                {t("changes.conflictBanner", { count: conflicted.length })}
               </div>
             ) : null}
-            {renderGroup("conflicted", "冲突", conflicted, "unstaged")}
+            {renderGroup("conflicted", t("changes.conflict"), conflicted, "unstaged")}
             {renderGroup(
               "staged",
-              "已暂存",
+              t("changes.stagedGroup"),
               staged,
               "staged",
               <GroupAction
-                label="全部取消暂存"
-                description="把已暂存的文件全部退回未暂存状态"
+                label={t("changes.unstageAll")}
+                description={t("changes.unstageAllDescription")}
                 onClick={() => void unstageAll()}
               >
                 <ArrowDownToLine size={11} />
@@ -249,21 +243,31 @@ export default function ChangesPanel() {
             )}
             {renderGroup(
               "unstaged",
-              "未暂存",
+              t("changes.unstagedGroup"),
               unstaged,
               "unstaged",
-              <GroupAction
-                label="全部添加"
-                description="把全部未暂存改动与未跟踪文件加入暂存区（git add -A）"
-                onClick={() => void stageAll()}
-              >
-                <ArrowUpFromLine size={11} />
-              </GroupAction>,
+              <>
+                <GroupAction
+                  label={t("changes.stageAll")}
+                  description={t("changes.stageAllDescription")}
+                  onClick={() => void stageAll()}
+                >
+                  <ArrowUpFromLine size={11} />
+                </GroupAction>
+                <GroupAction
+                  label={t("changes.discardAll")}
+                  description={t("changes.discardAllDescriptionShort")}
+                  tone="danger"
+                  onClick={() => setConfirmDiscardAll(true)}
+                >
+                  <Trash2 size={11} />
+                </GroupAction>
+              </>,
             )}
             {loading ? (
               <p className="flex items-center gap-1.5 px-2 py-2 text-[10.5px] text-ink-faint">
                 <Loader2 size={11} className="animate-spin" />
-                正在刷新
+                {t("changes.refreshing")}
               </p>
             ) : null}
           </>
@@ -291,9 +295,11 @@ export default function ChangesPanel() {
 
       <ConfirmDialog
         open={pendingDiscard !== null}
-        title="放弃该文件的改动"
-        description={`将丢弃「${pendingDiscard?.path ?? ""}」的未提交修改，该操作不可撤销。`}
-        confirmLabel="放弃改动"
+        title={t("changes.discardFile")}
+        description={t("changes.discardFileDescription", {
+          path: pendingDiscard?.path ?? "",
+        })}
+        confirmLabel={t("changes.discardFileConfirm")}
         tone="danger"
         onConfirm={() => {
           if (pendingDiscard) void discardFile(pendingDiscard.path);
@@ -303,9 +309,10 @@ export default function ChangesPanel() {
       />
 
       <ConfirmDialog
-        open={confirmDiscardAll}        title="放弃全部改动"
-        description={`将丢弃当前分支所有未提交的修改（含 ${entries.length} 个文件），并删除未跟踪的新文件，该操作不可撤销。`}
-        confirmLabel="全部放弃"
+        open={confirmDiscardAll}
+        title={t("changes.discardAll")}
+        description={t("changes.discardAllDescription", { count: entries.length })}
+        confirmLabel={t("changes.discardAllConfirm")}
         tone="danger"
         onConfirm={() => {
           void discardAll();
@@ -317,15 +324,17 @@ export default function ChangesPanel() {
   );
 }
 
-/** Inline “全部…” action shown on the right of a change group header. */
+/** Inline "stage all / discard all" action shown on the right of a change group header. */
 function GroupAction({
   label,
   description,
+  tone = "default",
   onClick,
   children,
 }: {
   label: string;
   description: string;
+  tone?: "default" | "danger";
   onClick: () => void;
   children: ReactNode;
 }) {
@@ -335,7 +344,11 @@ function GroupAction({
       onClick={onClick}
       aria-label={description}
       {...tip(description)}
-      className="inline-flex shrink-0 items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-medium normal-case tracking-normal text-ink-faint transition-colors hover:bg-accent-soft hover:text-accent"
+      className={`inline-flex shrink-0 items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-medium normal-case tracking-normal transition-colors ${
+        tone === "danger"
+          ? "text-ink-faint hover:bg-negative/10 hover:text-negative"
+          : "text-ink-faint hover:bg-accent-soft hover:text-accent"
+      }`}
     >
       {children}
       {label}

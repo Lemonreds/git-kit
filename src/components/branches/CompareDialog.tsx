@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Loader2 } from "lucide-react";
 
+import { useT } from "../../i18n";
 import { api } from "../../lib/ipc";
 import type { BranchSummary, ComparePreview, FileChange, FileDiff } from "../../lib/types";
 import { useAppStore } from "../../store/appStore";
@@ -28,6 +29,7 @@ function pickMain(branches: BranchSummary[], exclude: string): string {
 }
 
 export default function CompareDialog({ branch, onClose }: CompareDialogProps) {
+  const t = useT();
   const project = useAppStore((state) => state.activeProject);
   const branches = useAppStore((state) => state.branches);
   const remoteBranches = useAppStore((state) => state.remoteBranches);
@@ -91,8 +93,8 @@ export default function CompareDialog({ branch, onClose }: CompareDialogProps) {
   return (
     <Modal
       open
-      title="分支对比"
-      subtitle={`${baseBranch?.name ?? "基线"} → ${headBranch?.name ?? "对比分支"}`}
+      title={t("branches.compareTitle")}
+      subtitle={`${baseBranch?.name ?? t("branches.baseLabel")} → ${headBranch?.name ?? t("branches.headLabel")}`}
       onClose={onClose}
       width={760}
       footer={
@@ -101,7 +103,7 @@ export default function CompareDialog({ branch, onClose }: CompareDialogProps) {
           onClick={onClose}
           className="rounded-lg border border-line px-3 py-1.5 text-[12px] font-medium text-ink-soft transition-colors hover:bg-ink/5 hover:text-ink"
         >
-          关闭
+          {t("branches.close")}
         </button>
       }
     >
@@ -111,22 +113,22 @@ export default function CompareDialog({ branch, onClose }: CompareDialogProps) {
       >
         <div className="grid shrink-0 grid-cols-2 gap-2">
           <div>
-            <p className="mb-1 text-[10.5px] text-ink-faint">基线</p>
+            <p className="mb-1 text-[10.5px] text-ink-faint">{t("branches.baseLabel")}</p>
             <BaseBranchPicker
               branches={allBranches}
               value={baseRef}
               onChange={setBaseRef}
-              placeholder={baseBranch?.name ?? "基线"}
+              placeholder={baseBranch?.name ?? t("branches.baseLabel")}
               maxHeight={104}
             />
           </div>
           <div>
-            <p className="mb-1 text-[10.5px] text-ink-faint">对比分支</p>
+            <p className="mb-1 text-[10.5px] text-ink-faint">{t("branches.headLabel")}</p>
             <BaseBranchPicker
               branches={allBranches}
               value={headRef}
               onChange={setHeadRef}
-              placeholder={headBranch?.name ?? "对比分支"}
+              placeholder={headBranch?.name ?? t("branches.headLabel")}
               maxHeight={104}
             />
           </div>
@@ -135,7 +137,7 @@ export default function CompareDialog({ branch, onClose }: CompareDialogProps) {
         {loading ? (
           <p className="flex items-center gap-2 py-2 text-[11.5px] text-ink-faint">
             <Loader2 size={12} className="animate-spin" />
-            正在比对…
+            {t("branches.comparing")}
           </p>
         ) : error ? (
           <p className="whitespace-pre-line rounded-lg border border-negative/30 bg-negative/8 px-3 py-2 font-mono text-[10.5px] text-negative">
@@ -144,7 +146,10 @@ export default function CompareDialog({ branch, onClose }: CompareDialogProps) {
         ) : preview ? (
           <>
             <p className="shrink-0 font-mono text-[10.5px] text-ink-faint">
-              {preview.commitCount} 个提交 · {preview.files.length} 个文件
+              {t("branches.compareStats", {
+                commits: preview.commitCount,
+                count: preview.files.length,
+              })}
               <span className="ml-2 text-positive">+{preview.additions}</span>
               <span className="ml-1 text-negative">−{preview.deletions}</span>
             </p>
@@ -152,14 +157,14 @@ export default function CompareDialog({ branch, onClose }: CompareDialogProps) {
             <div className="min-h-0 flex-[0_0_auto] overflow-y-auto rounded-lg border border-line" style={{ maxHeight: 120 }}>
               <CommitMiniList
                 commits={preview.commits}
-                emptyLabel="两个分支没有差异"
+                emptyLabel={t("branches.compareEmpty")}
                 maxHeight={118}
               />
             </div>
 
             <div className="min-h-0 flex-1 overflow-y-auto rounded-lg border border-line">
               {preview.files.length === 0 ? (
-                <p className="px-3 py-3 text-[11px] text-ink-faint">没有文件差异</p>
+                <p className="px-3 py-3 text-[11px] text-ink-faint">{t("branches.noFileDiff")}</p>
               ) : (
                 preview.files.map((file) => (
                   <button
@@ -185,7 +190,7 @@ export default function CompareDialog({ branch, onClose }: CompareDialogProps) {
                 {diffLoading ? (
                   <p className="flex items-center gap-2 px-3 py-2 text-[11px] text-ink-faint">
                     <Loader2 size={11} className="animate-spin" />
-                    正在读取改动…
+                    {t("branches.loadingDiff")}
                   </p>
                 ) : diff ? (
                   <CompareDiff diff={diff} />
@@ -201,8 +206,9 @@ export default function CompareDialog({ branch, onClose }: CompareDialogProps) {
 
 /** Minimal unified diff body (no search / mode toggle needed here). */
 function CompareDiff({ diff }: { diff: FileDiff }) {
+  const t = useT();
   if (diff.isBinary) {
-    return <p className="px-3 py-2 text-[11px] text-ink-faint">二进制文件，无法按行展示</p>;
+    return <p className="px-3 py-2 text-[11px] text-ink-faint">{t("branches.binaryFile")}</p>;
   }
   return (
     <pre className="m-0 whitespace-pre px-3 py-2 font-mono text-[11px] leading-[1.55]">

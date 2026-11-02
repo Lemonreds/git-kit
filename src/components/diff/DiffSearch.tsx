@@ -1,6 +1,8 @@
 import { useEffect, useRef } from "react";
 import { ChevronDown, ChevronUp, Search, X } from "lucide-react";
 
+import { useT } from "../../i18n";
+
 interface DiffSearchProps {
   value: string;
   onChange: (value: string) => void;
@@ -21,6 +23,7 @@ export default function DiffSearch({
   onNext,
   onClose,
 }: DiffSearchProps) {
+  const t = useT();
   const input = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
@@ -49,7 +52,7 @@ export default function DiffSearch({
             onClose();
           }
         }}
-        placeholder="在改动中查找"
+        placeholder={t("diff.findInDiff")}
         spellCheck={false}
         className="w-[168px] bg-transparent font-mono text-[11.5px] text-ink outline-none placeholder:font-sans placeholder:text-ink-faint"
       />
@@ -64,7 +67,7 @@ export default function DiffSearch({
 
       <button
         type="button"
-        aria-label="上一个匹配"
+        aria-label={t("diff.prevMatch")}
         onClick={onPrev}
         disabled={count === 0}
         className="grid h-5 w-5 place-items-center rounded text-ink-faint transition-colors hover:bg-ink/8 hover:text-ink disabled:opacity-35"
@@ -73,7 +76,7 @@ export default function DiffSearch({
       </button>
       <button
         type="button"
-        aria-label="下一个匹配"
+        aria-label={t("diff.nextMatch")}
         onClick={onNext}
         disabled={count === 0}
         className="grid h-5 w-5 place-items-center rounded text-ink-faint transition-colors hover:bg-ink/8 hover:text-ink disabled:opacity-35"
@@ -82,7 +85,7 @@ export default function DiffSearch({
       </button>
       <button
         type="button"
-        aria-label="关闭查找"
+        aria-label={t("diff.closeSearch")}
         onClick={onClose}
         className="grid h-5 w-5 place-items-center rounded text-ink-faint transition-colors hover:bg-ink/8 hover:text-ink"
       >

@@ -3,6 +3,8 @@ import type { ReactNode } from "react";
 import { X } from "lucide-react";
 import { createPortal } from "react-dom";
 
+import { useT } from "../../i18n";
+
 interface ModalProps {
   open: boolean;
   title: string;
@@ -22,6 +24,8 @@ export default function Modal({
   footer,
   width = 440,
 }: ModalProps) {
+  const t = useT();
+
   useEffect(() => {
     if (!open) return undefined;
     const onKeyDown = (event: KeyboardEvent) => {
@@ -53,7 +57,7 @@ export default function Modal({
           <button
             type="button"
             onClick={onClose}
-            aria-label="关闭"
+            aria-label={t("common.close")}
             className="-mr-1 -mt-0.5 grid h-6 w-6 shrink-0 place-items-center rounded-md text-ink-faint transition-colors hover:bg-ink/8 hover:text-ink"
           >
             <X size={13} />

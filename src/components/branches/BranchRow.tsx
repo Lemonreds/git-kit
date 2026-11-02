@@ -1,5 +1,6 @@
 import { Cloud, GitBranch } from "lucide-react";
 
+import { useT } from "../../i18n";
 import { relativeTime, timeTooltip } from "../../lib/format";
 import type { BranchSummary } from "../../lib/types";
 import ShaChip from "../common/ShaChip";
@@ -41,6 +42,7 @@ export default function BranchRow({
   onTags,
   onReflog,
 }: BranchRowProps) {
+  const t = useT();
   const commit = branch.lastCommit;
   const isRemote = branch.isRemote;
   const localCopy = isRemote && branch.hasLocal;
@@ -66,7 +68,12 @@ export default function BranchRow({
         onClick={onOpen}
         className="flex min-w-0 flex-1 items-start gap-2.5 px-2 py-2 text-left"
       >
-        <span className={`mt-0.5 grid h-6 w-6 shrink-0 place-items-center rounded-md ${iconClass}`}>
+        <span
+          {...(isRemote
+            ? tip(localCopy ? t("branches.hasLocalCopy") : t("branches.remoteOnly"))
+            : {})}
+          className={`mt-0.5 grid h-6 w-6 shrink-0 place-items-center rounded-md ${iconClass}`}
+        >
           {isRemote ? <Cloud size={12} strokeWidth={2} /> : <GitBranch size={12} strokeWidth={2} />}
         </span>
 
@@ -86,17 +93,12 @@ export default function BranchRow({
             ) : null}
             {isRemote ? (
               <span className="shrink-0 rounded border border-line px-1 py-px text-[9px] font-medium text-ink-faint">
-                远程
-              </span>
-            ) : null}
-            {localCopy ? (
-              <span className="shrink-0 rounded border border-positive/35 bg-positive/8 px-1 py-px text-[9px] font-medium text-positive">
-                本地已有
+                {t("branches.remoteBadge")}
               </span>
             ) : null}
             {branch.ahead ? (
               <span
-                {...tip(`本地领先上游 ${branch.ahead} 个提交（未推送）`)}
+                {...tip(t("branches.aheadTip", { count: branch.ahead }))}
                 className="shrink-0 font-mono text-[9.5px] text-positive"
               >
                 ↑{branch.ahead}
@@ -104,7 +106,7 @@ export default function BranchRow({
             ) : null}
             {branch.behind ? (
               <span
-                {...tip(`上游有 ${branch.behind} 个提交未同步到本地`)}
+                {...tip(t("branches.behindTip", { count: branch.behind }))}
                 className="shrink-0 font-mono text-[9.5px] text-warning"
               >
                 ↓{branch.behind}
@@ -118,7 +120,7 @@ export default function BranchRow({
               <span className="truncate">{commit.summary}</span>
             </span>
           ) : (
-            <span className="mt-1 block text-[11px] text-ink-faint">暂无提交</span>
+            <span className="mt-1 block text-[11px] text-ink-faint">{t("branches.noCommits")}</span>
           )}
         </span>
       </button>

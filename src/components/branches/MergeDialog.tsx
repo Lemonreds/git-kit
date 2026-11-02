@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { AlertTriangle, Check, GitMerge, Loader2 } from "lucide-react";
 
+import { useT } from "../../i18n";
 import { api } from "../../lib/ipc";
 import type { BranchSummary, MergePreview } from "../../lib/types";
 import { useAppStore } from "../../store/appStore";
@@ -28,6 +29,7 @@ function pickDefaultSource(branches: BranchSummary[], current: string): string {
 }
 
 export default function MergeDialog({ current, onClose }: MergeDialogProps) {
+  const t = useT();
   const project = useAppStore((state) => state.activeProject);
   const branches = useAppStore((state) => state.branches);
   const remoteBranches = useAppStore((state) => state.remoteBranches);
@@ -84,7 +86,7 @@ export default function MergeDialog({ current, onClose }: MergeDialogProps) {
       setConflict(outcome.message ?? null);
       return;
     }
-    setError(outcome.message ?? "合并失败");
+    setError(outcome.message ?? t("branches.mergeFailed"));
   };
 
   const sourceBranch = allBranches.find((branch) => branch.refName === sourceRef);
@@ -93,8 +95,8 @@ export default function MergeDialog({ current, onClose }: MergeDialogProps) {
   return (
     <Modal
       open
-      title="合并分支到当前分支"
-      subtitle={`${sourceBranch?.name ?? "选择来源"} → ${current.name}`}
+      title={t("branches.mergeTitle")}
+      subtitle={`${sourceBranch?.name ?? t("branches.selectSource")} → ${current.name}`}
       onClose={busy ? () => undefined : onClose}
       width={560}
       footer={
@@ -105,7 +107,7 @@ export default function MergeDialog({ current, onClose }: MergeDialogProps) {
             disabled={busy}
             className="rounded-lg border border-line px-3 py-1.5 text-[12px] font-medium text-ink-soft transition-colors hover:bg-ink/5 hover:text-ink disabled:opacity-50"
           >
-            取消
+            {t("branches.cancel")}
           </button>
           <button
             type="button"
@@ -114,7 +116,9 @@ export default function MergeDialog({ current, onClose }: MergeDialogProps) {
             className="inline-flex items-center gap-1.5 rounded-lg bg-accent px-3 py-1.5 text-[12px] font-medium text-white transition-opacity hover:opacity-90 disabled:cursor-default disabled:opacity-45"
           >
             {busy ? <Loader2 size={12} className="animate-spin" /> : <GitMerge size={12} />}
-            {preview?.canFastForward && !noFf ? "快进合并" : "合并"}
+            {preview?.canFastForward && !noFf
+              ? t("branches.mergeFastForward")
+              : t("branches.mergeAction")}
           </button>
         </>
       }
@@ -122,9 +126,11 @@ export default function MergeDialog({ current, onClose }: MergeDialogProps) {
       <div className="space-y-3">
         <div>
           <p className="mb-1 flex items-center justify-between text-[11.5px] font-medium text-ink-soft">
-            来源分支
+            {t("branches.sourceBranch")}
             <span className="font-normal text-[10.5px] text-ink-faint">
-              {nothing ? "没有需要合并的提交" : `将合并 ${preview?.count ?? 0} 个提交`}
+              {nothing
+                ? t("branches.noMergeCommits")
+                : t("branches.willMergeCount", { count: preview?.count ?? 0 })}
             </span>
           </p>
           <BaseBranchPicker
@@ -132,18 +138,20 @@ export default function MergeDialog({ current, onClose }: MergeDialogProps) {
             value={sourceRef}
             onChange={setSourceRef}
             excludeRefName={current.refName}
-            placeholder={sourceBranch?.name ?? "搜索分支"}
+            placeholder={sourceBranch?.name ?? t("branches.searchBranches")}
             maxHeight={116}
           />
         </div>
 
         {preview && preview.count > 0 ? (
           <div>
-            <p className="mb-1 text-[11.5px] font-medium text-ink-soft">将合并进来的提交</p>
+            <p className="mb-1 text-[11.5px] font-medium text-ink-soft">
+              {t("branches.mergeCommitsIncoming")}
+            </p>
             <div className="overflow-hidden rounded-lg border border-line">
               <CommitMiniList
                 commits={preview.commits}
-                emptyLabel="没有需要合并的提交"
+                emptyLabel={t("branches.noMergeCommits")}
                 maxHeight={148}
               />
             </div>
@@ -165,16 +173,16 @@ export default function MergeDialog({ current, onClose }: MergeDialogProps) {
             className="sr-only"
           />
           <span className="min-w-0 flex-1 text-[11px] leading-relaxed text-ink-soft">
-            始终创建合并提交（--no-ff）
+            {t("branches.noFfLabel")}
             <span className="mt-0.5 block text-[10px] text-ink-faint">
-              不勾选时，能快进就直接快进，历史保持线性。
+              {t("branches.noFfHint")}
             </span>
           </span>
         </label>
 
         {preview?.dirty ? (
           <p className="rounded-lg border border-warning/35 bg-warning/8 px-3 py-2 text-[10.5px] leading-relaxed text-ink-soft">
-            工作区有未提交改动，若与合并内容冲突会失败，建议先提交或暂存。
+            {t("branches.dirtyMerge")}
           </p>
         ) : null}
 
@@ -182,7 +190,7 @@ export default function MergeDialog({ current, onClose }: MergeDialogProps) {
           <div className="rounded-lg border border-negative/35 bg-negative/8 px-3 py-2">
             <p className="flex items-center gap-1 text-[11.5px] font-medium text-negative">
               <AlertTriangle size={11.5} />
-              合并出现冲突，仓库停留在 merge 状态
+              {t("branches.mergeConflict")}
             </p>
             <p className="mt-1 max-h-28 overflow-y-auto whitespace-pre-line break-words font-mono text-[10px] leading-relaxed text-ink-soft">
               {conflict}

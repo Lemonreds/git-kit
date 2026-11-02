@@ -36,6 +36,14 @@ export function useHotkeys(): void {
         return;
       }
 
+      // Deliberately above the typing guard: ⌘J must also work while the
+      // keystrokes are going into the terminal's own textarea.
+      if (withMeta && event.key.toLowerCase() === "j") {
+        event.preventDefault();
+        store.toggleTerminalPanel();
+        return;
+      }
+
       if (isTypingTarget(event.target)) return;
 
       if (event.key === "Escape") {

@@ -1,3 +1,4 @@
+import { useT } from "../../i18n";
 import { relativeTime } from "../../lib/format";
 import type { CommitSummary } from "../../lib/types";
 import ShaChip from "../common/ShaChip";
@@ -7,7 +8,7 @@ interface CommitMiniListProps {
   commits: CommitSummary[];
   /** Highlight only the first N rows (squash preview window). */
   activeCount?: number;
-  /** Renders a "用这条" action per row. */
+  /** Renders a "use this" action per row. */
   onPick?: (commit: CommitSummary) => void;
   emptyLabel: string;
   maxHeight?: number;
@@ -24,6 +25,7 @@ export default function CommitMiniList({
   emptyLabel,
   maxHeight = 176,
 }: CommitMiniListProps) {
+  const t = useT();
   if (commits.length === 0) {
     return <p className="px-3 py-2 text-[11px] text-ink-faint">{emptyLabel}</p>;
   }
@@ -66,7 +68,7 @@ export default function CommitMiniList({
                     onClick={() => onPick(commit)}
                     className="ml-auto shrink-0 rounded px-1 text-[9.5px] text-ink-faint opacity-0 transition-opacity hover:bg-accent-soft hover:text-accent group-hover:opacity-100 focus-visible:opacity-100"
                   >
-                    用这条
+                    {t("branches.useThisCommit")}
                   </button>
                 ) : null}
               </p>

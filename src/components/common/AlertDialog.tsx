@@ -1,8 +1,11 @@
-import { useAppStore } from "../../store/appStore";
 import { createPortal } from "react-dom";
+
+import { useT } from "../../i18n";
+import { useAppStore } from "../../store/appStore";
 
 /** Blocking message for long git output (cherry-pick conflicts, push errors). */
 export default function AlertDialog() {
+  const t = useT();
   const alert = useAppStore((state) => state.alert);
   const dismiss = useAppStore((state) => state.dismissAlert);
 
@@ -24,7 +27,7 @@ export default function AlertDialog() {
             onClick={dismiss}
             className="rounded-lg bg-accent px-3 py-1.5 text-[12px] font-medium text-white transition-opacity hover:opacity-90"
           >
-            知道了
+            {t("common.gotIt")}
           </button>
         </div>
       </div>

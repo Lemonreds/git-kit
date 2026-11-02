@@ -6,7 +6,7 @@ import { createPortal } from "react-dom";
  * (`<TooltipLayer />`, mounted once in AppShell) renders the bubble, so adding
  * a tooltip costs no extra DOM and there is exactly one visible at a time.
  *
- *   <button {...tip("推送到远程", "⌘⇧P")}>…</button>
+ *   <button {...tip("Push to remote", "⌘⇧P")}>…</button>
  */
 export function tip(label: string, shortcut?: string): {
   "data-tip": string;

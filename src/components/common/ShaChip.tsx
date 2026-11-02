@@ -1,5 +1,6 @@
 import type { KeyboardEvent, MouseEvent } from "react";
 
+import { useT } from "../../i18n";
 import { copyText } from "../../lib/format";
 import { useAppStore } from "../../store/appStore";
 
@@ -27,6 +28,7 @@ export default function ShaChip({
   plain = false,
   className = "",
 }: ShaChipProps) {
+  const t = useT();
   const notify = useAppStore((state) => state.notify);
   const text = label ?? sha.slice(0, 7);
 
@@ -34,14 +36,17 @@ export default function ShaChip({
     event.preventDefault();
     event.stopPropagation();
     const ok = await copyText(sha);
-    notify(ok ? "success" : "error", ok ? `已复制 commit id ${sha.slice(0, 7)}` : "复制失败");
+    notify(
+      ok ? "success" : "error",
+      ok ? t("common.shaCopied", { sha: sha.slice(0, 7) }) : t("common.copyFailed"),
+    );
   };
 
   return (
     <span
       role="button"
       tabIndex={0}
-      aria-label={`复制 commit id ${sha}`}
+      aria-label={t("common.copySha", { sha })}
       onClick={(event) => void copy(event)}
       onKeyDown={(event) => {
         if (event.key === "Enter" || event.key === " ") void copy(event);

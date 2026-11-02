@@ -59,6 +59,9 @@ pub enum AppError {
     #[error("{0}")]
     BranchInvalid(String),
 
+    #[error("{0}")]
+    Terminal(String),
+
     #[error("Git 错误：{0}")]
     Git(#[from] git2::Error),
 
@@ -94,6 +97,7 @@ impl AppError {
             AppError::ConfigInvalid(_) => "config_invalid",
             AppError::PushRejected(_) => "push_rejected",
             AppError::BranchInvalid(_) => "branch_invalid",
+            AppError::Terminal(_) => "terminal",
             AppError::Git(err) => git_error_code(err),
             AppError::Io(err) => io_error_code(err),
             AppError::Serde(_) => "serde",

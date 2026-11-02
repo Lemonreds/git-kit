@@ -1,12 +1,18 @@
+import { t } from "../i18n";
+import type { MessageKey } from "../i18n";
 import type { Project } from "./types";
 
 export type ProjectSort = "recent" | "name" | "added";
 
-export const PROJECT_SORT_LABELS: Record<ProjectSort, string> = {
-  recent: "最近打开",
-  name: "名称",
-  added: "添加时间",
+const PROJECT_SORT_LABEL_KEYS: Record<ProjectSort, MessageKey> = {
+  recent: "lib.sort.recent",
+  name: "lib.sort.name",
+  added: "lib.sort.added",
 };
+
+export function projectSortLabel(sort: ProjectSort): string {
+  return t(PROJECT_SORT_LABEL_KEYS[sort]);
+}
 
 const collator = new Intl.Collator("zh-CN", { numeric: true, sensitivity: "base" });
 

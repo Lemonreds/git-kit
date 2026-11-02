@@ -1,5 +1,6 @@
 import { FileDiff, GitBranch } from "lucide-react";
 
+import { useT } from "../../i18n";
 import { useAppStore } from "../../store/appStore";
 import type { PaneMode } from "../../store/appStore";
 import { tip } from "../common/Tooltip";
@@ -10,6 +11,7 @@ interface PaneTabsProps {
 }
 
 export default function PaneTabs({ active, changesCount }: PaneTabsProps) {
+  const t = useT();
   const backToBranches = useAppStore((state) => state.backToBranches);
   const openChanges = useAppStore((state) => state.openChanges);
 
@@ -24,19 +26,19 @@ export default function PaneTabs({ active, changesCount }: PaneTabsProps) {
         }`}
       >
         <GitBranch size={11.5} />
-        分支
+        {t("workspace.tabBranches")}
       </button>
       <button
         type="button"
         onClick={() => void openChanges()}
         aria-pressed={active === "changes"}
-        {...tip("当前分支的未提交改动")}
+        {...tip(t("workspace.changesTip"))}
         className={`flex items-center gap-1.5 rounded-md px-2 py-[3px] text-[11.5px] font-medium transition-colors ${
           active === "changes" ? "bg-panel text-ink shadow-sm" : "text-ink-faint hover:text-ink-soft"
         }`}
       >
         <FileDiff size={11.5} />
-        改动
+        {t("workspace.tabChanges")}
         {changesCount > 0 ? (
           <span className="rounded-full bg-accent/14 px-1.5 text-[9.5px] font-semibold text-accent">
             {changesCount}

@@ -4,6 +4,7 @@ mod git;
 mod model;
 mod project_store;
 mod settings;
+mod terminal;
 
 use std::sync::Mutex;
 
@@ -11,6 +12,7 @@ use tauri::{Manager, WebviewWindow};
 
 use project_store::ProjectStore;
 use settings::SettingsStore;
+use terminal::TerminalManager;
 
 /// Keep the window reachable after display changes (undocked laptop, external
 /// monitor unplugged): if it no longer intersects any monitor, re-center it.
@@ -48,6 +50,8 @@ pub fn run() {
             let settings = SettingsStore::load(&app_dir)?;
             app.manage(Mutex::new(settings));
 
+            app.manage(Mutex::new(TerminalManager::new()));
+
             if let Some(window) = app.get_webview_window("main") {
                 ensure_window_visible(&window);
             }
@@ -72,6 +76,7 @@ pub fn run() {
             commands::get_commit,
             commands::get_commit_files,
             commands::get_file_diff,
+            commands::get_file_content,
             commands::get_worktree_status,
             commands::stage_file,
             commands::unstage_file,
@@ -117,6 +122,12 @@ pub fn run() {
             commands::compare_file_diff,
             commands::get_settings,
             commands::save_branch_templates,
+            terminal::terminal_open,
+            terminal::terminal_write,
+            terminal::terminal_resize,
+            terminal::terminal_pause,
+            terminal::terminal_resume,
+            terminal::terminal_close,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

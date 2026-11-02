@@ -5,7 +5,8 @@ use std::process::Command;
 use git2::{Oid, Repository};
 use tempfile::TempDir;
 
-use crate::git::{branches, commits, diff, ops, repo as git_repo};
+use crate::git::{branches, commits, diff, ops, repo as git_repo, status};
+use crate::model::FileStatus;
 
 fn init_repo() -> (TempDir, Repository) {
     let dir = tempfile::tempdir().expect("tempdir");
@@ -275,4 +276,173 @@ fn delete_remote_skips_branches_that_were_never_pushed() {
     assert_eq!(result.deleted, vec!["local-only".to_string()]);
     assert!(result.remote_deleted.is_empty());
     assert!(result.remote_failed.is_empty());
+}
+
+/// Unstaging everything must not fail on an empty pathspec list: tracked files
+/// return to their HEAD state and new files stay on disk as untracked.
+#[test]
+fn unstage_all_restores_head_state_for_every_path() {
+    let (dir, repo) = workspace();
+    stage_file(&repo, "src/main.rs", "fn main() {}\n");
+
+    let status = status::worktree_status(&repo).expect("status after staging");
+    assert_eq!(status.staged_count, 1);
+    assert_eq!(status.unstaged_count, 0);
+
+    status::unstage_all(&repo).expect("unstage all");
+
+    let status = status::worktree_status(&repo).expect("status after unstaging");
+    assert_eq!(status.staged_count, 0);
+    assert_eq!(status.entries.len(), 1);
+    assert_eq!(status.entries[0].path, "src/main.rs");
+    assert_eq!(status.entries[0].unstaged, Some(FileStatus::Untracked));
+    assert!(dir.path().join("src/main.rs").is_file());
+
+    // Running it twice (index already matches HEAD) stays a no-op.
+    status::unstage_all(&repo).expect("unstage all again");
+}
+
+/// Discarding everything restores tracked files and deletes untracked leftovers.
+#[test]
+fn discard_all_resets_worktree_and_drops_untracked_files() {
+    let (dir, repo) = workspace();
+    fs::write(dir.path().join("README.md"), "changed\n").expect("modify tracked");
+    stage_file(&repo, "notes/todo.md", "todo\n");
+    fs::write(dir.path().join("scratch.txt"), "scratch\n").expect("untracked");
+
+    status::discard_all(&repo).expect("discard all");
+
+    assert_eq!(
+        fs::read_to_string(dir.path().join("README.md")).expect("read readme"),
+        "hello\n"
+    );
+    assert!(!dir.path().join("notes/todo.md").exists());
+    assert!(!dir.path().join("scratch.txt").exists());
+    let status = status::worktree_status(&repo).expect("status after discard");
+    assert!(status.entries.is_empty());
+}
+
+/// Staging everything picks up modifications, deletions and nested untracked files.
+#[test]
+fn stage_all_includes_nested_untracked_files() {
+    let (dir, repo) = workspace();
+    fs::write(dir.path().join("README.md"), "changed\n").expect("modify tracked");
+    fs::create_dir_all(dir.path().join("src/deep")).expect("mkdir");
+    fs::write(dir.path().join("src/deep/new.rs"), "fn a() {}\n").expect("new file");
+
+    status::stage_all(&repo).expect("stage all");
+
+    let status = status::worktree_status(&repo).expect("status after stage");
+    assert_eq!(status.staged_count, 2);
+    assert_eq!(status.unstaged_count, 0);
+    assert!(status.entries.iter().all(|entry| entry.staged.is_some()));
+}
+
+// ---------------------------------------------------------------------------
+// Squash: base detection and the count ceiling
+// ---------------------------------------------------------------------------
+
+/// Repo whose default branch is `wip`, so the trunk refs stay free for the test.
+fn workspace_on(head: &str) -> (TempDir, Repository) {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let mut options = git2::RepositoryInitOptions::new();
+    options.initial_head(head);
+    let repo = Repository::init_opts(dir.path(), &options).expect("init repo");
+    {
+        let mut config = repo.config().expect("config");
+        config.set_str("user.name", "Test User").expect("name");
+        config
+            .set_str("user.email", "test@example.com")
+            .expect("email");
+    }
+    (dir, repo)
+}
+
+fn checkout(repo: &Repository, branch: &str) {
+    repo.set_head(&format!("refs/heads/{branch}")).expect("set head");
+    repo.checkout_head(Some(git2::build::CheckoutBuilder::new().force()))
+        .expect("checkout");
+}
+
+fn set_ref(repo: &Repository, name: &str, oid: Oid) {
+    repo.reference(name, oid, true, "test").expect("set ref");
+}
+
+/// A branch cut from a freshly fetched `origin/main` must not be measured
+/// against a stale local `main`, otherwise every recommended squash count is
+/// inflated by however far the local trunk lags behind.
+#[test]
+fn squash_preview_measures_from_the_closest_trunk() {
+    let (_dir, repo) = workspace_on("wip");
+
+    stage_file(&repo, "a.txt", "a\n");
+    let a = commit(&repo, "a");
+    set_ref(&repo, "refs/heads/main", a);
+    set_ref(&repo, "refs/remotes/origin/main", a);
+
+    stage_file(&repo, "b.txt", "b\n");
+    let b = commit(&repo, "b");
+    set_ref(&repo, "refs/remotes/origin/main", b);
+
+    repo.branch("feature", &repo.find_commit(b).expect("b"), false)
+        .expect("branch");
+    checkout(&repo, "feature");
+    stage_file(&repo, "c.txt", "c\n");
+    commit(&repo, "c");
+    stage_file(&repo, "d.txt", "d\n");
+    commit(&repo, "d");
+
+    let preview = ops::squash_preview(&repo, "feature").expect("preview");
+
+    assert_eq!(preview.base_branch.as_deref(), Some("origin/main"));
+    assert_eq!(preview.count, 2, "only the branch's own commits count");
+    assert_eq!(preview.total_commits, 4);
+    assert_eq!(preview.commits.len(), 2);
+    assert_eq!(preview.oldest_message.as_deref(), Some("c"));
+}
+
+/// Squashing on the trunk itself has nothing to measure: the answer is zero
+/// rather than "every commit in the repository".
+#[test]
+fn squash_preview_on_the_trunk_reports_nothing_to_squash() {
+    let (_dir, repo) = workspace_on("wip");
+
+    stage_file(&repo, "a.txt", "a\n");
+    let a = commit(&repo, "a");
+    set_ref(&repo, "refs/heads/main", a);
+    set_ref(&repo, "refs/remotes/origin/main", a);
+    checkout(&repo, "main");
+
+    let preview = ops::squash_preview(&repo, "main").expect("preview");
+
+    assert_eq!(preview.base_branch.as_deref(), Some("origin/main"));
+    assert_eq!(preview.count, 0);
+    assert!(preview.commits.is_empty());
+}
+
+/// `reset --soft HEAD~N` needs a commit to reset to, so folding *every* commit
+/// away has to fail with an explanation instead of a raw git error.
+#[test]
+fn squash_rejects_folding_every_commit() {
+    let (dir, repo) = workspace_on("main");
+    stage_file(&repo, "a.txt", "a\n");
+    commit(&repo, "a");
+
+    let error = ops::squash_commits(dir.path(), "main", 1, "one")
+        .expect_err("a single commit cannot be squashed");
+    assert!(error.to_string().contains("最多可压缩 0 个"), "{error}");
+
+    stage_file(&repo, "b.txt", "b\n");
+    commit(&repo, "b");
+    stage_file(&repo, "c.txt", "c\n");
+    commit(&repo, "c");
+
+    let error = ops::squash_commits(dir.path(), "main", 3, "all three")
+        .expect_err("the oldest commit must survive");
+    assert!(error.to_string().contains("最多可压缩 2 个"), "{error}");
+
+    let result = ops::squash_commits(dir.path(), "main", 2, "b + c").expect("squash two");
+    assert_eq!(result.squashed, 2);
+    let log = ops::squash_preview(&repo, "main").expect("preview");
+    assert_eq!(log.total_commits, 2, "3 commits folded into a + one");
 }

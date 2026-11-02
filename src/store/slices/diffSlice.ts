@@ -1,5 +1,6 @@
 import type { StateCreator } from "zustand";
 
+import { t } from "../../i18n";
 import { api, IpcError } from "../../lib/ipc";
 import type { FileChange, FileDiff } from "../../lib/types";
 import type { AppState } from "../appStore";
@@ -78,11 +79,11 @@ export const createDiffSlice: StateCreator<AppState, [], [], DiffSlice> = (set, 
       const keep = keepPath ? files.files.find((item) => item.path === keepPath) : undefined;
       const next = keep ?? files.files[0];
       if (next) await get().selectFile(next);
-      else notify("info", "刷新后该提交已经没有文件改动");
+      else notify("info", t("store.commitHasNoFiles"));
     } catch (error) {
       if (epoch !== token.detail) return;
       set({ filesLoading: false });
-      fail("刷新改动文件列表失败", error);
+      fail(t("store.refreshFilesFailed"), error);
     }
   };
 
@@ -116,7 +117,7 @@ export const createDiffSlice: StateCreator<AppState, [], [], DiffSlice> = (set, 
       if (isStaleDiffError(error) && allowRefresh) {
         // The worktree (or the index) changed behind the list: refresh it and
         // retry once when the same kind of change is still there.
-        notify("info", `找不到「${path}」的改动，正在刷新改动列表`);
+        notify("info", t("store.worktreeDiffMissing", { path }));
         await get().refreshChanges();
         const entry = get().changes?.entries.find((item) => item.path === path);
         const stillChanged = staged ? entry?.staged : entry?.unstaged;
@@ -128,7 +129,7 @@ export const createDiffSlice: StateCreator<AppState, [], [], DiffSlice> = (set, 
         return;
       }
 
-      fail("读取文件改动失败", error);
+      fail(t("store.loadFileDiffFailed"), error);
     }
   };
 
@@ -168,7 +169,7 @@ export const createDiffSlice: StateCreator<AppState, [], [], DiffSlice> = (set, 
       } catch (error) {
         if (epoch !== token.detail) return;
         set({ filesLoading: false });
-        fail("读取提交改动失败", error);
+        fail(t("store.loadCommitDiffFailed"), error);
       }
     },
 
@@ -201,7 +202,7 @@ export const createDiffSlice: StateCreator<AppState, [], [], DiffSlice> = (set, 
         if (isStaleDiffError(error) && !refreshingFiles) {
           refreshingFiles = true;
           try {
-            notify("info", `找不到「${file.path}」的改动，正在刷新文件列表`);
+            notify("info", t("store.commitDiffMissing", { path: file.path }));
             await reloadCommitFiles();
           } finally {
             refreshingFiles = false;

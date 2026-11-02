@@ -1,7 +1,8 @@
 import { useMemo, useState } from "react";
 import { ArrowUpDown, Check, FolderGit2, Plus } from "lucide-react";
 
-import { PROJECT_SORT_LABELS, groupProjects } from "../../lib/sortProjects";
+import { useT } from "../../i18n";
+import { groupProjects, projectSortLabel } from "../../lib/sortProjects";
 import type { ProjectSort } from "../../lib/sortProjects";
 import type { Project } from "../../lib/types";
 import { useAppStore } from "../../store/appStore";
@@ -14,10 +15,17 @@ import SidebarFooter from "./SidebarFooter";
 const SORT_OPTIONS: ProjectSort[] = ["recent", "name", "added"];
 
 export default function ProjectSidebar() {
-  const { projects, projectSort, activeId } = useSlice((state) => ({
+  const t = useT();
+  const { projects, projectSort, activeId, liveTerminalIds } = useSlice((state) => ({
     projects: state.projects,
     projectSort: state.projectSort,
     activeId: state.activeProject?.id ?? null,
+    // Joined into a primitive so this selector stays referentially stable: an
+    // array would make `useShallow` re-render the sidebar on every store write.
+    liveTerminalIds: state.terminals
+      .filter((tab) => tab.status === "live")
+      .map((tab) => tab.projectId)
+      .join("\u0000"),
   }));
 
   const setProjectSort = useAppStore((state) => state.setProjectSort);
@@ -26,6 +34,7 @@ export default function ProjectSidebar() {
   const removeProject = useAppStore((state) => state.removeProject);
   const relinkProject = useAppStore((state) => state.relinkProject);
   const pinProject = useAppStore((state) => state.pinProject);
+  const openTerminal = useAppStore((state) => state.openTerminal);
 
   const [pendingRemoval, setPendingRemoval] = useState<Project | null>(null);
   const [sortOpen, setSortOpen] = useState(false);
@@ -38,15 +47,22 @@ export default function ProjectSidebar() {
     setPendingRemoval(null);
   };
 
+  const withTerminal = useMemo(
+    () => new Set(liveTerminalIds ? liveTerminalIds.split("\u0000") : []),
+    [liveTerminalIds],
+  );
+
   const renderRow = (project: Project) => (
     <ProjectRow
       key={project.id}
       project={project}
       active={project.id === activeId}
+      terminalOpen={withTerminal.has(project.id)}
       onSelect={() => void selectProject(project.id)}
       onRemove={() => setPendingRemoval(project)}
       onRelink={() => void relinkProject(project.id)}
       onTogglePin={() => void pinProject(project.id, !project.pinned)}
+      onOpenTerminal={() => openTerminal(project.id)}
     />
   );
 
@@ -57,7 +73,7 @@ export default function ProjectSidebar() {
         className="drag-region relative flex h-11 shrink-0 items-center justify-between border-b border-line/50 px-3"
       >
         <span className="text-[10.5px] font-semibold uppercase tracking-[0.09em] text-ink-faint">
-          项目
+          {t("projects.title")}
         </span>
         <div className="no-drag flex items-center gap-1">
           {projects.length > 0 ? (
@@ -66,14 +82,18 @@ export default function ProjectSidebar() {
             </span>
           ) : null}
           <IconButton
-            label="排序方式"
-            shortcut={PROJECT_SORT_LABELS[projectSort]}
+            label={t("projects.sortBy")}
+            shortcut={projectSortLabel(projectSort)}
             active={sortOpen}
             onClick={() => setSortOpen((open) => !open)}
           >
             <ArrowUpDown size={14} />
           </IconButton>
-          <IconButton label="添加项目" shortcut="⌘O" onClick={() => void addProject()}>
+          <IconButton
+            label={t("projects.addProject")}
+            shortcut="⌘O"
+            onClick={() => void addProject()}
+          >
             <Plus size={14} strokeWidth={2.2} />
           </IconButton>
         </div>
@@ -89,7 +109,7 @@ export default function ProjectSidebar() {
             />
             <div className="no-drag animate-pop absolute right-2 top-[38px] z-40 w-40 overflow-hidden rounded-xl border border-line bg-raised p-1 shadow-float">
               <p className="px-1.5 pb-1 pt-0.5 text-[9.5px] font-semibold uppercase tracking-[0.08em] text-ink-faint">
-                排序（置顶固定在最上）
+                {t("projects.sortTitle")}
               </p>
               {SORT_OPTIONS.map((option) => (
                 <button
@@ -105,7 +125,7 @@ export default function ProjectSidebar() {
                       : "text-ink-soft hover:bg-ink/5 hover:text-ink"
                   }`}
                 >
-                  <span className="flex-1">{PROJECT_SORT_LABELS[option]}</span>
+                  <span className="flex-1">{projectSortLabel(option)}</span>
                   {projectSort === option ? <Check size={11} /> : null}
                 </button>
               ))}
@@ -124,9 +144,9 @@ export default function ProjectSidebar() {
             <span className="grid h-9 w-9 place-items-center rounded-xl border border-line bg-panel text-ink-faint transition-colors group-hover:text-accent">
               <FolderGit2 size={16} />
             </span>
-            <span className="text-[12px] font-medium text-ink">添加本地仓库</span>
+            <span className="text-[12px] font-medium text-ink">{t("projects.addRepo")}</span>
             <span className="text-[10.5px] leading-relaxed text-ink-faint">
-              选择一个已有的 Git 仓库文件夹
+              {t("projects.addRepoHint")}
             </span>
           </button>
         ) : (
@@ -136,7 +156,7 @@ export default function ProjectSidebar() {
             {pinned.length > 0 && rest.length > 0 ? (
               <div className="flex items-center gap-2 px-2 pb-1 pt-2.5">
                 <span className="text-[9.5px] font-semibold uppercase tracking-[0.08em] text-ink-faint">
-                  其他项目
+                  {t("projects.others")}
                 </span>
                 <span className="h-px flex-1 bg-line" />
               </div>
@@ -146,7 +166,7 @@ export default function ProjectSidebar() {
 
             {pinned.length > 0 && rest.length === 0 ? (
               <p className="px-2 pt-2 text-[10px] leading-relaxed text-ink-faint">
-                全部项目都已置顶
+                {t("projects.allPinned")}
               </p>
             ) : null}
           </div>
@@ -157,9 +177,11 @@ export default function ProjectSidebar() {
 
       <ConfirmDialog
         open={pendingRemoval !== null}
-        title="移除项目"
-        description={`从列表中移除「${pendingRemoval?.name ?? ""}」，磁盘上的仓库文件不会被删除。`}
-        confirmLabel="移除"
+        title={t("projects.removeTitle")}
+        description={t("projects.removeDescription", {
+          name: pendingRemoval?.name ?? "",
+        })}
+        confirmLabel={t("projects.removeConfirm")}
         tone="danger"
         onConfirm={confirmRemoval}
         onCancel={() => setPendingRemoval(null)}

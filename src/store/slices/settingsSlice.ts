@@ -1,5 +1,6 @@
 import type { StateCreator } from "zustand";
 
+import { t } from "../../i18n";
 import { api } from "../../lib/ipc";
 import type { BranchTemplate, RepoIdentity } from "../../lib/types";
 import type { AppState } from "../appStore";
@@ -44,7 +45,7 @@ export const createSettingsSlice: StateCreator<AppState, [], [], SettingsSlice> 
         });
       } catch (error) {
         set({ templatesLoaded: true });
-        fail("读取分支模板失败", error);
+        fail(t("store.loadTemplatesFailed"), error);
       }
     },
 
@@ -56,10 +57,10 @@ export const createSettingsSlice: StateCreator<AppState, [], [], SettingsSlice> 
           defaultTemplateId: settings.defaultTemplateId,
           templatesLoaded: true,
         });
-        notify("success", "分支模板已保存");
+        notify("success", t("store.templatesSaved"));
         return true;
       } catch (error) {
-        fail("保存分支模板失败", error);
+        fail(t("store.saveTemplatesFailed"), error);
         return false;
       }
     },
@@ -77,17 +78,17 @@ export const createSettingsSlice: StateCreator<AppState, [], [], SettingsSlice> 
         set({ identity, identityLoading: false });
       } catch (error) {
         set({ identityLoading: false });
-        fail("读取提交身份失败", error);
+        fail(t("store.loadIdentityFailed"), error);
       }
     },
 
     async saveIdentity(name, email) {
       const project = get().activeProject;
-      if (!project) return "没有打开的项目";
+      if (!project) return t("store.noProject");
       try {
         const identity = await api.setRepoIdentity(project.path, name, email);
         set({ identity });
-        notify("success", "已更新当前仓库的提交身份");
+        notify("success", t("store.identityUpdated"));
         return null;
       } catch (error) {
         return errorMessage(error);

@@ -1,5 +1,6 @@
 import type { StateCreator } from "zustand";
 
+import { t } from "../../i18n";
 import { api, IpcError } from "../../lib/ipc";
 import type { ReflogEntry, RepoOperationState, StashEntry, TagInfo } from "../../lib/types";
 import type { AppState } from "../appStore";
@@ -68,11 +69,17 @@ export const createWorkflowSlice: StateCreator<AppState, [], [], WorkflowSlice> 
         await get().refreshChanges();
         notify(
           "success",
-          action === "abort" ? "已中止该操作" : action === "skip" ? "已跳过当前提交" : "已继续并完成",
+          t(
+            action === "abort"
+              ? "store.opAborted"
+              : action === "skip"
+                ? "store.opSkipped"
+                : "store.opContinued",
+          ),
         );
         return true;
       } catch (error) {
-        fail("操作失败", error);
+        fail(t("store.actionFailed"), error);
         await get().refreshRepoState();
         await get().refreshBranches();
         return false;
@@ -86,7 +93,7 @@ export const createWorkflowSlice: StateCreator<AppState, [], [], WorkflowSlice> 
         const list = await api.stashList(project.path);
         set({ stashEntries: list.entries });
       } catch (error) {
-        fail("读取暂存列表失败", error);
+        fail(t("store.loadStashesFailed"), error);
       }
     },
 
@@ -98,10 +105,10 @@ export const createWorkflowSlice: StateCreator<AppState, [], [], WorkflowSlice> 
         set({ stashEntries: list.entries });
         invalidateCaches();
         await get().refreshChanges();
-        notify("success", "已暂存当前改动");
+        notify("success", t("store.stashed"));
         return true;
       } catch (error) {
-        fail("暂存改动失败", error);
+        fail(t("store.stashFailed"), error);
         return false;
       }
     },
@@ -114,12 +121,12 @@ export const createWorkflowSlice: StateCreator<AppState, [], [], WorkflowSlice> 
         set({ stashEntries: list.entries });
         invalidateCaches();
         await get().refreshChanges();
-        notify("success", "已恢复暂存的改动");
+        notify("success", t("store.stashRestored"));
         return { ok: true };
       } catch (error) {
         const code = error instanceof IpcError ? error.code : "unknown";
         const message = errorMessage(error);
-        if (code !== "stash_conflict") fail("恢复暂存失败", error);
+        if (code !== "stash_conflict") fail(t("store.stashRestoreFailed"), error);
         await get().refreshChanges();
         await get().refreshRepoState();
         return { ok: false, code, message };
@@ -132,10 +139,10 @@ export const createWorkflowSlice: StateCreator<AppState, [], [], WorkflowSlice> 
       try {
         const list = await api.stashDrop(project.path, index);
         set({ stashEntries: list.entries });
-        notify("success", "已删除该条 stash");
+        notify("success", t("store.stashDropped"));
         return true;
       } catch (error) {
-        fail("删除 stash 失败", error);
+        fail(t("store.stashDropFailed"), error);
         return false;
       }
     },
@@ -149,12 +156,12 @@ export const createWorkflowSlice: StateCreator<AppState, [], [], WorkflowSlice> 
         set({ selectedCommitSha: null, commitFiles: [], diff: null });
         await get().refreshChanges();
         await get().refreshBranches();
-        notify("success", `已修正上一次提交 · ${result.shortSha}`);
+        notify("success", t("store.amended", { sha: result.shortSha }));
         return { ok: true, needsForcePush: result.needsForcePush };
       } catch (error) {
         const code = error instanceof IpcError ? error.code : "unknown";
         const message = errorMessage(error);
-        fail("修正提交失败", error);
+        fail(t("store.amendFailed"), error);
         return { ok: false, code, message };
       }
     },
@@ -165,10 +172,10 @@ export const createWorkflowSlice: StateCreator<AppState, [], [], WorkflowSlice> 
       try {
         await api.ignorePath(project.path, path, isDir);
         await get().refreshChanges();
-        notify("info", `已加入 .gitignore：${path}`);
+        notify("info", t("store.ignored", { path }));
         return true;
       } catch (error) {
-        fail("加入 .gitignore 失败", error);
+        fail(t("store.ignoreFailed"), error);
         return false;
       }
     },
@@ -185,14 +192,17 @@ export const createWorkflowSlice: StateCreator<AppState, [], [], WorkflowSlice> 
         notify(
           "success",
           result.strategy === "up-to-date"
-            ? `${source} 已经在当前分支里`
-            : `${result.strategy === "fast-forward" ? "已快进合并" : "已合并"} ${source} · ${result.shortSha}`,
+            ? t("store.mergeUpToDate", { source })
+            : t(
+                result.strategy === "fast-forward" ? "store.mergeFastForwarded" : "store.merged",
+                { source, sha: result.shortSha },
+              ),
         );
         return { ok: true };
       } catch (error) {
         const code = error instanceof IpcError ? error.code : "unknown";
         const message = errorMessage(error);
-        if (code !== "merge_conflict") fail("合并失败", error);
+        if (code !== "merge_conflict") fail(t("store.mergeFailed"), error);
         await get().refreshChanges();
         await get().refreshRepoState();
         return { ok: false, code, message };
@@ -207,12 +217,12 @@ export const createWorkflowSlice: StateCreator<AppState, [], [], WorkflowSlice> 
         invalidateCaches();
         await get().refreshChanges();
         await get().refreshBranches();
-        notify("success", `已生成反向提交 ${result.shortSha}`);
+        notify("success", t("store.reverted", { sha: result.shortSha }));
         return { ok: true };
       } catch (error) {
         const code = error instanceof IpcError ? error.code : "unknown";
         const message = errorMessage(error);
-        if (code !== "revert_conflict") fail("撤销提交失败", error);
+        if (code !== "revert_conflict") fail(t("store.revertFailed"), error);
         await get().refreshChanges();
         await get().refreshRepoState();
         return { ok: false, code, message };
@@ -225,17 +235,17 @@ export const createWorkflowSlice: StateCreator<AppState, [], [], WorkflowSlice> 
       try {
         set({ tags: await api.listTags(project.path) });
       } catch (error) {
-        fail("读取标签失败", error);
+        fail(t("store.loadTagsFailed"), error);
       }
     },
 
     async createTag(name, target, message) {
       const project = get().activeProject;
-      if (!project) return "没有打开的项目";
+      if (!project) return t("store.noProject");
       try {
         const tags = await api.createTag(project.path, name, target, message);
         set({ tags });
-        notify("success", `已创建标签 ${name}`);
+        notify("success", t("store.tagCreated", { name }));
         return null;
       } catch (error) {
         return errorMessage(error);
@@ -251,19 +261,19 @@ export const createWorkflowSlice: StateCreator<AppState, [], [], WorkflowSlice> 
         if (result.remoteFailure) {
           // The local tag is already gone — say so instead of a bare error toast.
           get().showAlert(
-            `标签 ${name} 已从本地删除`,
-            `origin 上的同名标签没有删除：\n${result.remoteFailure}`,
+            t("store.tagDeletedLocallyTitle", { name }),
+            t("store.tagRemoteDeleteFailed", { error: result.remoteFailure }),
           );
           return;
         }
         notify(
           "success",
           result.remoteDeleted
-            ? `已删除本地与 origin 上的标签 ${name}`
-            : `已删除标签 ${name}`,
+            ? t("store.tagDeletedBoth", { name })
+            : t("store.tagDeleted", { name }),
         );
       } catch (error) {
-        fail("删除标签失败", error);
+        fail(t("store.deleteTagFailed"), error);
       }
     },
 
@@ -272,10 +282,10 @@ export const createWorkflowSlice: StateCreator<AppState, [], [], WorkflowSlice> 
       if (!project) return false;
       try {
         const remote = await api.pushTag(project.path, name);
-        notify("success", `已推送标签 ${name} 到 ${remote}`);
+        notify("success", t("store.tagPushed", { name, remote }));
         return true;
       } catch (error) {
-        fail("推送标签失败", error);
+        fail(t("store.pushTagFailed"), error);
         return false;
       }
     },
@@ -286,7 +296,7 @@ export const createWorkflowSlice: StateCreator<AppState, [], [], WorkflowSlice> 
       try {
         set({ reflog: await api.reflogEntries(project.path, 20) });
       } catch (error) {
-        fail("读取 reflog 失败", error);
+        fail(t("store.loadReflogFailed"), error);
       }
     },
 
@@ -300,10 +310,13 @@ export const createWorkflowSlice: StateCreator<AppState, [], [], WorkflowSlice> 
         await get().refreshChanges();
         await get().refreshBranches();
         await get().refreshRepoState();
-        notify("success", `已${hard ? "强制" : ""}重置到 ${result.shortSha}`);
+        notify(
+          "success",
+          t(hard ? "store.resetHard" : "store.reset", { sha: result.shortSha }),
+        );
         return true;
       } catch (error) {
-        fail("重置失败", error);
+        fail(t("store.resetFailed"), error);
         return false;
       }
     },

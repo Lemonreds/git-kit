@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Check, Loader2, Plus, Tag, Trash2, Upload } from "lucide-react";
 
+import { useT } from "../../i18n";
 import { useAppStore } from "../../store/appStore";
 import ConfirmDialog from "../common/ConfirmDialog";
 import IconButton from "../common/IconButton";
@@ -14,6 +15,7 @@ interface TagDialogProps {
 }
 
 export default function TagDialog({ defaultTarget, onClose }: TagDialogProps) {
+  const t = useT();
   const tags = useAppStore((state) => state.tags);
   const refreshTags = useAppStore((state) => state.refreshTags);
   const createTag = useAppStore((state) => state.createTag);
@@ -52,8 +54,8 @@ export default function TagDialog({ defaultTarget, onClose }: TagDialogProps) {
     <>
       <Modal
         open
-        title="标签"
-        subtitle={activeProject ? activeProject.name : "当前仓库的标签"}
+        title={t("branches.tagsTitle")}
+        subtitle={activeProject ? activeProject.name : t("branches.tagsCurrentRepo")}
         onClose={onClose}
         width={560}
         footer={
@@ -62,19 +64,21 @@ export default function TagDialog({ defaultTarget, onClose }: TagDialogProps) {
             onClick={onClose}
             className="rounded-lg border border-line px-3 py-1.5 text-[12px] font-medium text-ink-soft transition-colors hover:bg-ink/5 hover:text-ink"
           >
-            关闭
+            {t("branches.close")}
           </button>
         }
       >
         <div className="space-y-3">
           <div>
             <p className="mb-1 flex items-center justify-between text-[11.5px] font-medium text-ink-soft">
-              已有标签
-              <span className="font-normal text-[10.5px] text-ink-faint">{tags.length} 个</span>
+              {t("branches.existingTags")}
+              <span className="font-normal text-[10.5px] text-ink-faint">
+                {t("branches.tagCount", { count: tags.length })}
+              </span>
             </p>
             {tags.length === 0 ? (
               <p className="rounded-lg border border-dashed border-line px-3 py-3 text-center text-[11px] text-ink-faint">
-                还没有标签
+                {t("branches.noTags")}
               </p>
             ) : (
               <div className="max-h-[200px] overflow-y-auto rounded-lg border border-line">
@@ -91,7 +95,7 @@ export default function TagDialog({ defaultTarget, onClose }: TagDialogProps) {
                         </span>
                         {tag.annotated ? (
                           <span className="shrink-0 rounded border border-line px-1 py-px text-[9px] text-ink-faint">
-                            附注
+                            {t("branches.annotatedTag")}
                           </span>
                         ) : null}
                         <ShaChip sha={tag.sha} plain className="text-[10px]" />
@@ -101,7 +105,7 @@ export default function TagDialog({ defaultTarget, onClose }: TagDialogProps) {
                       ) : null}
                     </div>
                     <IconButton
-                      label="推送该标签到远程"
+                      label={t("branches.pushTag")}
                       size="sm"
                       onClick={() => {
                         setPushing(tag.name);
@@ -115,7 +119,7 @@ export default function TagDialog({ defaultTarget, onClose }: TagDialogProps) {
                       )}
                     </IconButton>
                     <IconButton
-                      label="删除标签"
+                      label={t("branches.deleteTag")}
                       size="sm"
                       tone="danger"
                       onClick={() => {
@@ -134,11 +138,13 @@ export default function TagDialog({ defaultTarget, onClose }: TagDialogProps) {
           <div className="rounded-lg border border-line bg-canvas/40 p-2.5">
             <p className="mb-1.5 flex items-center gap-1 text-[11.5px] font-medium text-ink-soft">
               <Plus size={11} />
-              新建标签
+              {t("branches.newTag")}
             </p>
             <div className="grid grid-cols-2 gap-2">
               <label className="block">
-                <span className="mb-1 block text-[10px] text-ink-faint">标签名</span>
+                <span className="mb-1 block text-[10px] text-ink-faint">
+                  {t("branches.tagName")}
+                </span>
                 <input
                   value={name}
                   onChange={(event) => setName(event.target.value)}
@@ -148,7 +154,9 @@ export default function TagDialog({ defaultTarget, onClose }: TagDialogProps) {
                 />
               </label>
               <label className="block">
-                <span className="mb-1 block text-[10px] text-ink-faint">目标（分支 / 提交）</span>
+                <span className="mb-1 block text-[10px] text-ink-faint">
+                  {t("branches.tagTarget")}
+                </span>
                 <input
                   value={target}
                   onChange={(event) => setTarget(event.target.value)}
@@ -159,14 +167,16 @@ export default function TagDialog({ defaultTarget, onClose }: TagDialogProps) {
               </label>
             </div>
             <label className="mt-2 block">
-              <span className="mb-1 block text-[10px] text-ink-faint">说明（填写则创建附注标签）</span>
+              <span className="mb-1 block text-[10px] text-ink-faint">
+                {t("branches.tagMessage")}
+              </span>
               <input
                 value={message}
                 onChange={(event) => setMessage(event.target.value)}
                 onKeyDown={(event) => {
                   if (event.key === "Enter") void submit();
                 }}
-                placeholder="例如：生产发布 2026-10-29"
+                placeholder={t("branches.tagMessagePlaceholder")}
                 className="w-full rounded-lg border border-line bg-panel px-2.5 py-1.5 text-[12px] text-ink outline-none transition-colors placeholder:text-ink-faint focus:border-accent/60"
               />
             </label>
@@ -178,7 +188,7 @@ export default function TagDialog({ defaultTarget, onClose }: TagDialogProps) {
                 className="inline-flex items-center gap-1 rounded-lg bg-accent px-2.5 py-1.5 text-[11.5px] font-medium text-white transition-opacity hover:opacity-90 disabled:cursor-default disabled:opacity-45"
               >
                 {busy ? <Loader2 size={11} className="animate-spin" /> : <Plus size={11} />}
-                创建标签
+                {t("branches.createTag")}
               </button>
             </div>
             {error ? (
@@ -192,13 +202,13 @@ export default function TagDialog({ defaultTarget, onClose }: TagDialogProps) {
 
       <ConfirmDialog
         open={pendingDelete !== null}
-        title={`删除标签 ${pendingDelete ?? ""}？`}
+        title={t("branches.confirmDeleteTagTitle", { name: pendingDelete ?? "" })}
         description={
           deleteRemote
-            ? "本地标签会先删除，随后执行 git push origin --delete 删除 origin 上的同名标签；远程标签删除后无法从远程恢复。"
-            : "只删除本地标签，origin 上的同名标签不受影响。"
+            ? t("branches.deleteTagRemoteBody")
+            : t("branches.deleteTagLocalBody")
         }
-        confirmLabel="删除"
+        confirmLabel={t("branches.confirmDelete")}
         tone="danger"
         onConfirm={() => {
           const target2 = pendingDelete;
@@ -223,9 +233,9 @@ export default function TagDialog({ defaultTarget, onClose }: TagDialogProps) {
             className="sr-only"
           />
           <span className="min-w-0 flex-1 text-[11.5px] leading-relaxed text-ink">
-            同时删除 origin 上的同名标签
+            {t("branches.deleteTagRemoteLabel")}
             <span className="mt-0.5 block text-[10.5px] text-ink-faint">
-              默认不勾选；勾选后远程标签一并删除，且无法在远程恢复。
+              {t("branches.deleteTagRemoteHint")}
             </span>
           </span>
         </label>

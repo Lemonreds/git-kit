@@ -6,8 +6,8 @@ import type { RowComponentProps } from "react-window";
 import type { BranchSummary } from "../../lib/types";
 
 /**
- * One line of the branch panel. Section headers ("远程分支 · …" with its
- * 加载更多/收起 buttons) are list items too, so local + remote branches share a
+ * One line of the branch panel. Section headers (the remote divider with its
+ * load more / collapse buttons) are list items too, so local + remote branches share a
  * single virtualised scroll container. Their markup is owned by BranchPanel so
  * the virtualised and plain lists render exactly the same header.
  */

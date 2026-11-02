@@ -212,6 +212,35 @@ pub fn ref_file_diff(
     finish_file_diff(&diff, index, path)
 }
 
+/// Get the full content of a file at a specific commit.
+pub fn get_file_content(
+    repo: &Repository,
+    sha: &str,
+    path: &str,
+) -> Result<String, AppError> {
+    let oid = git2::Oid::from_str(sha)
+        .map_err(|_| AppError::message(format!("无效的提交 SHA: {}", sha)))?;
+    let commit = repo
+        .find_commit(oid)
+        .map_err(|_| AppError::CommitNotFound(sha.to_string()))?;
+    let tree = commit.tree()?;
+    let entry = tree
+        .get_path(std::path::Path::new(path))
+        .map_err(|_| AppError::message(format!("文件不存在: {}", path)))?;
+    let object = entry.to_object(repo)?;
+    let blob = object
+        .as_blob()
+        .ok_or_else(|| AppError::message(format!("路径不是文件: {}", path)))?;
+
+    // Check if binary
+    if blob.is_binary() {
+        return Err(AppError::message("二进制文件无法显示文本内容".to_string()));
+    }
+
+    let content = String::from_utf8_lossy(blob.content()).into_owned();
+    Ok(content)
+}
+
 pub fn diff_stats(
     repo: &Repository,
     commit: &Commit<'_>,
@@ -370,3 +399,4 @@ pub fn worktree_file_diff(
     let (index, diff) = found.ok_or_else(|| AppError::FileNotChanged(path.to_string()))?;
     finish_file_diff(&diff, index, path)
 }
+

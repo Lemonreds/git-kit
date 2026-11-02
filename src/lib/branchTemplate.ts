@@ -1,3 +1,5 @@
+import { t } from "../i18n";
+import type { MessageKey } from "../i18n";
 import type { BranchDateFormat } from "./types";
 
 /** The dynamic part of a template rule, e.g. `prod_{date}_BASE`. */
@@ -14,7 +16,7 @@ export interface DateOption {
   value: string;
   /** `10-29` */
   dayLabel: string;
-  /** 今天 / 明天 / 周六 */
+  /** Today / tomorrow / a weekday name */
   hint: string;
   offset: number;
 }
@@ -32,16 +34,30 @@ export function formatDate(date: Date, format: BranchDateFormat): string {
   return `${y}${m}${d}`;
 }
 
-const WEEKDAYS = ["周日", "周一", "周二", "周三", "周四", "周五", "周六"];
+const WEEKDAYS: MessageKey[] = [
+  "lib.weekday.sun",
+  "lib.weekday.mon",
+  "lib.weekday.tue",
+  "lib.weekday.wed",
+  "lib.weekday.thu",
+  "lib.weekday.fri",
+  "lib.weekday.sat",
+];
 
-/** Today plus the next `count - 1` days — the default date picker of 新建分支. */
+/** Today plus the next `count - 1` days — the default date picker of the new-branch dialog. */
 export function upcomingDates(count = 5, format: BranchDateFormat = "yyyyMMdd"): DateOption[] {
   const today = new Date();
   return Array.from({ length: count }, (_, offset) => {
     const date = new Date(today);
     date.setDate(today.getDate() + offset);
     const hint =
-      offset === 0 ? "今天" : offset === 1 ? "明天" : offset === 2 ? "后天" : WEEKDAYS[date.getDay()];
+      offset === 0
+        ? t("lib.date.today")
+        : offset === 1
+          ? t("lib.date.tomorrow")
+          : offset === 2
+            ? t("lib.date.dayAfterTomorrow")
+            : t(WEEKDAYS[date.getDay()]);
     return {
       value: formatDate(date, format),
       dayLabel: `${pad(date.getMonth() + 1)}-${pad(date.getDate())}`,
@@ -72,7 +88,7 @@ export function ruleSegments(rule: string): RuleSegment[] {
   const segments: RuleSegment[] = [];
   parts.forEach((part, index) => {
     if (part) segments.push({ text: part, token: false });
-    if (index < parts.length - 1) segments.push({ text: "日期", token: true });
+    if (index < parts.length - 1) segments.push({ text: t("lib.date.segment"), token: true });
   });
   return segments;
 }
@@ -88,25 +104,25 @@ export interface BranchNameCheck {
  */
 export function checkBranchName(name: string): BranchNameCheck {
   const value = name.trim();
-  if (!value) return { valid: false, reason: "请输入分支名" };
-  if (value.startsWith("-")) return { valid: false, reason: "分支名不能以 - 开头" };
-  if (/\s/.test(value)) return { valid: false, reason: "分支名不能包含空格" };
+  if (!value) return { valid: false, reason: t("lib.branchName.empty") };
+  if (value.startsWith("-")) return { valid: false, reason: t("lib.branchName.startsWithDash") };
+  if (/\s/.test(value)) return { valid: false, reason: t("lib.branchName.hasSpace") };
   if (/[~^:?*\[\\\x00-\x1f\x7f]/.test(value)) {
-    return { valid: false, reason: "分支名不能包含 ~ ^ : ? * [ \\ 或控制字符" };
+    return { valid: false, reason: t("lib.branchName.invalidChar") };
   }
-  if (value.includes("..")) return { valid: false, reason: "分支名不能包含连续的两个点 .." };
-  if (value.includes("@{")) return { valid: false, reason: "分支名不能包含 @{" };
+  if (value.includes("..")) return { valid: false, reason: t("lib.branchName.doubleDot") };
+  if (value.includes("@{")) return { valid: false, reason: t("lib.branchName.atBrace") };
   if (value.startsWith("/") || value.endsWith("/")) {
-    return { valid: false, reason: "分支名不能以 / 开头或结尾" };
+    return { valid: false, reason: t("lib.branchName.edgeSlash") };
   }
   if (value.startsWith(".") || value.endsWith(".")) {
-    return { valid: false, reason: "分支名不能以 . 开头或结尾" };
+    return { valid: false, reason: t("lib.branchName.edgeDot") };
   }
-  if (value.includes("//")) return { valid: false, reason: "分支名不能包含连续的 /" };
+  if (value.includes("//")) return { valid: false, reason: t("lib.branchName.doubleSlash") };
   if (value.split("/").some((part) => part.endsWith(".lock"))) {
-    return { valid: false, reason: "分支名的任一段不能以 .lock 结尾" };
+    return { valid: false, reason: t("lib.branchName.lockSuffix") };
   }
-  if (value === "@") return { valid: false, reason: "@ 不是合法的分支名" };
+  if (value === "@") return { valid: false, reason: t("lib.branchName.atSign") };
   return { valid: true };
 }
 

@@ -1,5 +1,6 @@
 import type { StateCreator } from "zustand";
 
+import { t } from "../../i18n";
 import { api } from "../../lib/ipc";
 import type { WorktreeStatus } from "../../lib/types";
 import type { AppState } from "../appStore";
@@ -58,7 +59,7 @@ export const createChangesSlice: StateCreator<AppState, [], [], ChangesSlice> = 
         }
       }
     } catch (error) {
-      fail("操作失败", error);
+      fail(t("store.actionFailed"), error);
       await get().refreshChanges();
     }
   };
@@ -83,7 +84,7 @@ export const createChangesSlice: StateCreator<AppState, [], [], ChangesSlice> = 
         syncStatusCache(changes);
         void get().refreshRepoState();
       } catch (error) {
-        fail("读取工作区改动失败", error);
+        fail(t("store.loadChangesFailed"), error);
       } finally {
         set({ changesLoading: false });
       }
@@ -105,7 +106,7 @@ export const createChangesSlice: StateCreator<AppState, [], [], ChangesSlice> = 
       const project = get().activeProject;
       if (!project) return;
       await applyStatusMutation(() => api.discardFile(project.path, path));
-      notify("info", "已放弃该文件的改动");
+      notify("info", t("store.fileDiscarded"));
     },
 
     async stageAll() {
@@ -124,7 +125,7 @@ export const createChangesSlice: StateCreator<AppState, [], [], ChangesSlice> = 
       const project = get().activeProject;
       if (!project) return;
       await applyStatusMutation(() => api.discardAll(project.path));
-      notify("info", "已放弃全部未提交改动");
+      notify("info", t("store.allDiscarded"));
     },
 
     async commitStaged(message) {
@@ -138,11 +139,11 @@ export const createChangesSlice: StateCreator<AppState, [], [], ChangesSlice> = 
         await get().refreshBranches();
         notify(
           "success",
-          `已提交 ${result.shortSha} · ${result.filesChanged} 个文件`,
+          t("store.committed", { sha: result.shortSha, count: result.filesChanged }),
         );
         return true;
       } catch (error) {
-        fail("提交失败", error);
+        fail(t("store.commitFailed"), error);
         await get().refreshChanges();
         return false;
       }
