@@ -1,7 +1,3 @@
-import { getCurrentWindow } from "@tauri-apps/api/window";
-
-import { applyTerminalTheme } from "./terminal";
-
 export type Theme = "light" | "dark";
 
 const STORAGE_KEY = "gk.theme";
@@ -20,23 +16,18 @@ export function readTheme(): Theme {
 }
 
 /**
- * Push the theme everywhere it is visible: CSS tokens, native window chrome and
- * the xterm palettes. Called at boot (before the first paint) and on every change.
+ * Apply the theme to the app's own surface: CSS tokens only.
+ *
+ * Deliberately scoped: the native window chrome and the terminal keep their own
+ * (light) look, so switching the theme here never leaks into them. Called at boot
+ * before the first paint and on every change, which is what makes the switch in
+ * Settings take effect immediately.
  */
 export function applyTheme(theme: Theme): void {
   const root = document.documentElement;
   root.dataset.theme = theme;
   // Keeps native scrollbars, form controls and text selection in the same mode.
   root.style.colorScheme = theme;
-
-  // The macOS title bar is native: without this the traffic lights and the
-  // overlay stay light above a dark window.
-  void getCurrentWindow()
-    .setTheme(theme)
-    .catch(() => undefined);
-
-  // xterm reads the `--gk-*` tokens when its theme is built.
-  applyTerminalTheme();
 }
 
 export function setStoredTheme(theme: Theme): void {

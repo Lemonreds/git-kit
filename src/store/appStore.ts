@@ -4,7 +4,9 @@ import { createBranchOpsSlice, type BranchOpsSlice } from "./slices/branchOpsSli
 import { createBranchSlice, type BranchSlice } from "./slices/branchSlice";
 import { createChangesSlice, type ChangesSlice } from "./slices/changesSlice";
 import { createCommitsSlice, type CommitsSlice } from "./slices/commitsSlice";
+import { createConflictSlice, type ConflictSlice } from "./slices/conflictSlice";
 import { createDiffSlice, type DiffSlice } from "./slices/diffSlice";
+import { createFileHistorySlice, type FileHistorySlice } from "./slices/fileHistorySlice";
 import { createProjectSlice, type ProjectSlice } from "./slices/projectSlice";
 import { createPrefsSlice, type PrefsSlice } from "./slices/prefsSlice";
 import { createSettingsSlice, type SettingsSlice } from "./slices/settingsSlice";
@@ -23,6 +25,8 @@ export type * from "./types";
  * - `commitsSlice`   commit history of the opened branch (pagination)
  * - `diffSlice`      commit files + the rendered diff
  * - `changesSlice`   worktree status and staging
+ * - `conflictSlice`  the conflict resolver (one conflicted path at a time)
+ * - `fileHistorySlice` file history + per-line blame of the open file
  * - `workflowSlice`  repo operation state, stash, tags, reflog, reset
  * - `settingsSlice`  branch templates, settings dialog, commit identity
  * - `prefsSlice`     app-wide appearance (theme)
@@ -39,6 +43,8 @@ export type AppState = ProjectSlice &
   CommitsSlice &
   DiffSlice &
   ChangesSlice &
+  ConflictSlice &
+  FileHistorySlice &
   WorkflowSlice &
   SettingsSlice &
   PrefsSlice &
@@ -52,6 +58,8 @@ export const useAppStore = create<AppState>()((...args) => ({
   ...createCommitsSlice(...args),
   ...createDiffSlice(...args),
   ...createChangesSlice(...args),
+  ...createConflictSlice(...args),
+  ...createFileHistorySlice(...args),
   ...createWorkflowSlice(...args),
   ...createSettingsSlice(...args),
   ...createPrefsSlice(...args),

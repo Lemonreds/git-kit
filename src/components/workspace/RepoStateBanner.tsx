@@ -1,4 +1,4 @@
-import { AlertTriangle, Ban, Check, SkipForward } from "lucide-react";
+import { AlertTriangle, Ban, Check, SkipForward, Wrench } from "lucide-react";
 
 import type { MessageKey } from "../../i18n";
 import { useT } from "../../i18n";
@@ -19,6 +19,7 @@ export default function RepoStateBanner() {
   const t = useT();
   const state = useAppStore((store) => store.repoState);
   const repoOperation = useAppStore((store) => store.repoOperation);
+  const openConflict = useAppStore((store) => store.openConflict);
 
   if (!state || state.kind === "none") return null;
 
@@ -54,6 +55,16 @@ export default function RepoStateBanner() {
       )}
 
       <span className="ml-auto flex items-center gap-1">
+        {hasConflicts ? (
+          <button
+            type="button"
+            onClick={() => void openConflict(state.conflicts[0])}
+            className="inline-flex items-center gap-1 rounded-md border border-warning/50 bg-warning/12 px-1.5 py-0.5 text-[10.5px] font-medium text-warning transition-colors hover:bg-warning/20"
+          >
+            <Wrench size={10} />
+            {t("conflict.title")}
+          </button>
+        ) : null}
         <button
           type="button"
           onClick={() => void repoOperation("continue")}

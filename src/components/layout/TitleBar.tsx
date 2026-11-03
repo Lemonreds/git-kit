@@ -10,12 +10,13 @@ import { tip } from "../common/Tooltip";
 import SettingsDialog from "../settings/SettingsDialog";
 export default function TitleBar() {
   const t = useT();
-  const { project, snapshot, changes, settingsOpen, terminalOpen } = useSlice((state) => ({
+  const { project, snapshot, changes, settingsOpen, terminalOpen, refreshing } = useSlice((state) => ({
     project: state.activeProject,
     snapshot: state.snapshot,
     changes: state.changes,
     settingsOpen: state.settingsOpen,
     terminalOpen: state.terminalOpen && state.terminals.length > 0,
+    refreshing: state.refreshing,
   }));
 
   const refresh = useAppStore((state) => state.refresh);
@@ -77,9 +78,9 @@ export default function TitleBar() {
           label={t("layout.refresh")}
           shortcut="⌘R"
           onClick={() => void refresh()}
-          disabled={!project}
+          disabled={!project || refreshing}
         >
-          <RefreshCw size={14} />
+          <RefreshCw size={14} className={refreshing ? "animate-spin" : undefined} />
         </IconButton>
         <IconButton
           label={terminalOpen ? t("layout.collapseTerminal") : t("layout.openTerminal")}

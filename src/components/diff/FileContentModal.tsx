@@ -52,17 +52,26 @@ export default function FileContentModal({ open, sha, path, onClose }: FileConte
   if (!open) return null;
 
   return createPortal(
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/40 p-4 backdrop-blur-sm">
+    <div
+      data-modal="true"
+      role="dialog"
+      aria-modal="true"
+      onClick={onClose}
+      className="animate-fade fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4 backdrop-blur-[2px]"
+    >
+      {/* `bg-raised` is the panel colour of every other dialog in the app: the
+          old `bg-surface` did not exist in the theme, which left this dialog
+          transparent and unreadable over the diff behind it. */}
       <div
-        className="flex max-h-[90vh] w-full max-w-4xl flex-col rounded-lg border border-line bg-surface shadow-2xl"
-        onClick={(e) => e.stopPropagation()}
+        className="animate-in flex max-h-[88vh] w-full max-w-4xl flex-col overflow-hidden rounded-2xl border border-line bg-raised shadow-float"
+        onClick={(event) => event.stopPropagation()}
       >
         {/* Header */}
-        <div className="flex items-start gap-3 border-b border-line px-4 py-3">
+        <div className="flex shrink-0 items-start gap-3 border-b border-line bg-canvas/40 px-4 py-3">
           <FileText size={16} className="mt-0.5 shrink-0 text-ink-soft" />
           <div className="min-w-0 flex-1">
             <p className="text-[13px] font-semibold text-ink">{baseName(path)}</p>
-            <p className="mt-0.5 text-[11px] text-ink-faint">{path}</p>
+            <p className="mt-0.5 truncate text-[11px] text-ink-faint">{path}</p>
           </div>
           <button
             type="button"
@@ -75,7 +84,7 @@ export default function FileContentModal({ open, sha, path, onClose }: FileConte
         </div>
 
         {/* Content */}
-        <div className="min-h-0 flex-1 overflow-y-auto">
+        <div className="min-h-0 flex-1 overflow-y-auto bg-panel">
           {loading ? (
             <div className="flex items-center justify-center gap-2 py-20 text-ink-faint">
               <Loader2 size={16} className="animate-spin" />
@@ -86,7 +95,7 @@ export default function FileContentModal({ open, sha, path, onClose }: FileConte
               <p className="text-[12px] text-negative">{error}</p>
             </div>
           ) : content !== null ? (
-            <pre className="overflow-x-auto px-4 py-3 font-mono text-[11px] leading-relaxed text-ink">
+            <pre className="min-w-full overflow-x-auto px-4 py-3 font-mono text-[11px] leading-relaxed text-ink">
               <code>{content}</code>
             </pre>
           ) : null}
@@ -94,7 +103,7 @@ export default function FileContentModal({ open, sha, path, onClose }: FileConte
 
         {/* Footer */}
         {content !== null && !loading && !error ? (
-          <div className="border-t border-line px-4 py-2.5 text-[11px] text-ink-faint">
+          <div className="shrink-0 border-t border-line bg-canvas/40 px-4 py-2.5 text-[11px] text-ink-faint">
             {t("diff.lineCount", { count: content.split("\n").length })}
           </div>
         ) : null}

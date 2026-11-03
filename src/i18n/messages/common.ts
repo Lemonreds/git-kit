@@ -21,6 +21,7 @@ export const zh = {
   "common.copyFailed": "复制失败",
   "common.shaCopied": "已复制 commit id {sha}",
   "common.copySha": "复制 commit id {sha}",
+  "common.more": "更多操作",
 } satisfies Record<string, Message>;
 
 export const en: Record<keyof typeof zh, Message> = {
@@ -44,4 +45,5 @@ export const en: Record<keyof typeof zh, Message> = {
   "common.copyFailed": "Copy failed",
   "common.shaCopied": "Copied commit id {sha}",
   "common.copySha": "Copy commit id {sha}",
+  "common.more": "More actions",
 };

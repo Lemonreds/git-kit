@@ -1,6 +1,8 @@
 import { useEffect } from "react";
 
+import { t } from "../i18n";
 import { useAppStore } from "../store/appStore";
+import { countUnresolved } from "../store/slices/conflictSlice";
 
 function isTypingTarget(target: EventTarget | null): boolean {
   const element = target as HTMLElement | null;
@@ -51,9 +53,54 @@ export function useHotkeys(): void {
         return;
       }
 
+      // ⌘S in the conflict resolver: write the resolution and stage the file.
+      if (withMeta && !event.shiftKey && event.key.toLowerCase() === "s") {
+        if (!store.conflictPath) return;
+        event.preventDefault();
+        if (store.conflictSaving || !store.conflictParsed) return;
+        const unresolved = countUnresolved(store.conflictParsed, store.conflictDrafts);
+        if (unresolved > 0) {
+          store.notify(
+            "info",
+            t("store.conflictUnresolvedFirst", { count: unresolved }),
+          );
+          return;
+        }
+        void store.saveConflict();
+        return;
+      }
+
+      // ⌘⇧H / ⌘⇧B: history / blame of the file the diff column is showing.
+      if (withMeta && event.shiftKey && (event.key.toLowerCase() === "h" || event.key.toLowerCase() === "b")) {
+        const blame = event.key.toLowerCase() === "b";
+        const target = store.worktreeTarget;
+        const path = target?.path ?? store.selectedFilePath;
+        if (!path) return;
+        const rev = target ? null : store.selectedCommitSha;
+        event.preventDefault();
+        void store.openFileHistory(path, rev).then(() => {
+          if (blame) store.setFileHistoryTab("blame");
+        });
+        return;
+      }
+
       if (isTypingTarget(event.target)) return;
 
       if (event.key === "Escape") {
+        // The resolver / file history take over the column: Esc steps out of
+        // them first, without touching the pane behind.
+        if (store.conflictPath) {
+          if (Object.keys(store.conflictDrafts).length === 0) {
+            event.preventDefault();
+            store.closeConflict();
+          }
+          return;
+        }
+        if (store.fileView) {
+          event.preventDefault();
+          store.closeFileView();
+          return;
+        }
         if (store.pane !== "branches") {
           event.preventDefault();
           store.backToBranches();
@@ -61,7 +108,17 @@ export function useHotkeys(): void {
         return;
       }
 
-      if (store.pane !== "commits" || store.commits.length === 0) return;
+      if (store.pane !== "commits") return;
+
+      // Back to the branch/tag list: ← or X (the pane's own back affordance).
+      // Deliberately before the commit navigation below.
+      if (event.key === "ArrowLeft" || event.key.toLowerCase() === "x") {
+        event.preventDefault();
+        store.backToBranches();
+        return;
+      }
+
+      if (store.commits.length === 0) return;
 
       if (event.key === "ArrowDown" || event.key === "ArrowUp") {
         event.preventDefault();

@@ -1,10 +1,12 @@
 import { t } from "../i18n";
 import { translateError } from "../i18n/errors";
 import type {
+  BlameWindow,
   CommitFiles,
   CommitPage,
   FileChange,
   FileDiff,
+  FileHistoryPage,
   Project,
   ProjectList,
 } from "../lib/types";
@@ -45,6 +47,20 @@ export const diffCache = new LRUCache<string, FileDiff>(20, {
 });
 
 /**
+ * File history / blame caches. Both are bound by weight, not just entries: a
+ * blame window carries one row per hunk, and a history page one row per commit,
+ * so an entry cap alone would still let a few huge files dominate the session.
+ */
+export const historyCache = new LRUCache<string, FileHistoryPage>(20, {
+  maxWeight: 1_500_000,
+  weigh: (page) => page.entries.length * 160 + 256,
+});
+export const blameCache = new LRUCache<string, BlameWindow>(60, {
+  maxWeight: 4_000_000,
+  weigh: (window) => window.hunks.length * 96 + window.lines.length * 64 + 512,
+});
+
+/**
  * Epoch counters shared by the slices: `project` guards repo-wide loads (a late
  * response for the previous project must not land), `detail` guards commit /
  * diff loads inside one project.
@@ -55,6 +71,8 @@ export function invalidateCaches() {
   commitsCache.clear();
   filesCache.clear();
   diffCache.clear();
+  historyCache.clear();
+  blameCache.clear();
 }
 
 /**
@@ -65,6 +83,8 @@ export function invalidateCaches() {
 export function releaseTransientCaches() {
   filesCache.clear();
   diffCache.clear();
+  historyCache.clear();
+  blameCache.clear();
 }
 
 /**
@@ -127,6 +147,14 @@ export function clearDetail() {
     diffLoading: false,
     worktreeTarget: null,
     changesLoading: false,
+    // The resolver and the file-history view belong to the repository that was
+    // open when they started, so leaving that context closes them too.
+    conflictPath: null,
+    conflictDetail: null,
+    conflictParsed: null,
+    conflictDrafts: {},
+    conflictLoading: false,
+    fileView: null,
   };
 }
 

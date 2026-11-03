@@ -39,6 +39,7 @@ export default function CommitDialog({
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
   const [amend, setAmend] = useState(false);
+  const [skipHooks, setSkipHooks] = useState(false);
   const [amendPreview, setAmendPreview] = useState<HeadCommitPreview | null>(null);
   const [amendError, setAmendError] = useState<string | null>(null);
 
@@ -78,7 +79,7 @@ export default function CommitDialog({
       onClose();
       return;
     }
-    const ok = await commitStaged(trimmed);
+    const ok = await commitStaged(trimmed, skipHooks);
     setBusy(false);
     if (ok) onClose();
   };
@@ -153,6 +154,30 @@ export default function CommitDialog({
               : ""}
           </span>
         </div>
+
+        {amend ? null : (
+          <div className="flex items-center justify-between rounded-lg border border-line bg-canvas/40 px-2.5 py-1.5">
+            <button
+              type="button"
+              onClick={() => setSkipHooks((value) => !value)}
+              disabled={busy}
+              className="flex items-center gap-2 text-left"
+            >
+              <span
+                className={`grid h-3.5 w-3.5 shrink-0 place-items-center rounded-[4px] border transition-colors ${
+                  skipHooks ? "border-accent bg-accent text-white" : "border-line-strong bg-panel"
+                }`}
+              >
+                {skipHooks ? <Check size={9} strokeWidth={3} /> : null}
+              </span>
+              <span className="text-[11.5px] text-ink">{t("changes.skipHooksToggle")}</span>
+            </button>
+            <span className="flex shrink-0 items-center gap-1.5 text-[10px] text-ink-faint">
+              <span className="font-mono">{skipHooks ? "git commit -n" : ""}</span>
+              <HelpTip label={t("changes.skipHooksHelp")} />
+            </span>
+          </div>
+        )}
 
         {amendError ? (
           <p className="whitespace-pre-line rounded-lg border border-negative/30 bg-negative/8 px-3 py-2 font-mono text-[10px] text-negative">

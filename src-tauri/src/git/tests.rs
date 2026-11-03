@@ -5,8 +5,10 @@ use std::process::Command;
 use git2::{Oid, Repository};
 use tempfile::TempDir;
 
-use crate::git::{branches, commits, diff, ops, repo as git_repo, status, workflow};
-use crate::model::FileStatus;
+use crate::git::{
+    branches, commits, conflict, diff, history, ops, repo as git_repo, status, workflow,
+};
+use crate::model::{ConflictKind, FileStatus};
 
 fn init_repo() -> (TempDir, Repository) {
     let dir = tempfile::tempdir().expect("tempdir");
@@ -560,4 +562,198 @@ fn remote_tag_list_without_a_remote_is_empty() {
     assert!(page.remote.is_none());
     assert!(page.tags.is_empty());
     assert!(page.failure.is_none());
+}
+
+// --- conflict resolution ----------------------------------------------------
+
+fn git_ok(dir: &Path, args: &[&str]) {
+    let output = Command::new("git")
+        .arg("-C")
+        .arg(dir)
+        .args(args)
+        .output()
+        .expect("run git");
+    assert!(
+        output.status.success(),
+        "git {:?} failed: {}",
+        args,
+        String::from_utf8_lossy(&output.stderr)
+    );
+}
+
+/// Two branches edit the same lines of README.md, then a merge is left
+/// conflicted — the exact state the resolver has to handle.
+fn conflicted_workspace() -> (TempDir, Repository) {
+    let (dir, repo) = workspace();
+    let head = repo.head().unwrap().shorthand().unwrap().to_string();
+
+    stage_file(&repo, "README.md", "hello\nmine\n");
+    commit(&repo, "feat: mine");
+
+    git_ok(dir.path(), &["checkout", "-b", "side", "HEAD~1"]);
+    let repo = Repository::open(dir.path()).expect("reopen");
+    stage_file(&repo, "README.md", "hello\ntheirs\n");
+    commit(&repo, "feat: theirs");
+
+    git_ok(dir.path(), &["checkout", &head]);
+    let output = Command::new("git")
+        .arg("-C")
+        .arg(dir.path())
+        .args(["merge", "--no-edit", "side"])
+        .output()
+        .expect("run merge");
+    assert!(!output.status.success(), "the merge must stop on a conflict");
+
+    let repo = Repository::open(dir.path()).expect("reopen after merge");
+    (dir, repo)
+}
+
+#[test]
+fn conflicts_are_listed_with_their_three_stages() {
+    let (_dir, repo) = conflicted_workspace();
+    let files = conflict::list_conflicts(&repo).expect("list conflicts");
+    assert_eq!(files.len(), 1);
+    assert_eq!(files[0].path, "README.md");
+    assert_eq!(files[0].kind, ConflictKind::BothModified);
+    assert!(files[0].has_base && files[0].has_ours && files[0].has_theirs);
+
+    let detail = conflict::conflict_file(&repo, "README.md").expect("conflict detail");
+    assert!(detail.ours.text.as_deref().unwrap_or_default().contains("mine"));
+    assert!(detail.theirs.text.as_deref().unwrap_or_default().contains("theirs"));
+    assert!(detail.base.text.is_some());
+    assert_eq!(detail.eol, "lf");
+    assert!(detail.complete && !detail.truncated);
+    let worktree = detail.worktree_text.unwrap_or_default();
+    assert!(worktree.contains("<<<<<<<"), "worktree keeps the markers");
+
+    // The status banner and the resolver share one index walk.
+    assert_eq!(workflow::repo_state(&repo).conflicts, vec!["README.md"]);
+}
+
+#[test]
+fn resolve_conflict_writes_the_file_and_stages_it() {
+    let (dir, _repo) = conflicted_workspace();
+    let state = conflict::resolve_conflict(dir.path(), "README.md", "hello\nmine\ntheirs\n")
+        .expect("resolve");
+    assert!(state.conflicts.is_empty());
+    assert_eq!(state.kind, "merge", "the merge itself is still in progress");
+
+    assert_eq!(
+        fs::read_to_string(dir.path().join("README.md")).expect("read"),
+        "hello\nmine\ntheirs\n"
+    );
+
+    let repo = Repository::open(dir.path()).expect("reopen");
+    let index = repo.index().expect("index");
+    assert!(index.conflicts().expect("conflicts").next().is_none());
+    let entry = index.get_path(Path::new("README.md"), 0).expect("staged entry");
+    let blob = repo.find_blob(entry.id).expect("blob");
+    assert_eq!(blob.content(), b"hello\nmine\ntheirs\n");
+}
+
+#[test]
+fn resolve_conflict_rejects_paths_that_are_not_conflicted() {
+    let (dir, _repo) = conflicted_workspace();
+    let error = conflict::resolve_conflict(dir.path(), "src/other.rs", "x").expect_err("rejected");
+    assert_eq!(error.code(), "conflict_invalid");
+
+    let error = conflict::resolve_conflict(dir.path(), "../escape.txt", "x").expect_err("rejected");
+    assert_eq!(error.code(), "conflict_invalid");
+}
+
+#[test]
+fn resolve_conflict_side_takes_one_whole_version() {
+    let (dir, _repo) = conflicted_workspace();
+    let state = conflict::resolve_conflict_side(dir.path(), "README.md", "theirs").expect("theirs");
+    assert!(state.conflicts.is_empty());
+    assert_eq!(
+        fs::read_to_string(dir.path().join("README.md")).expect("read"),
+        "hello\ntheirs\n"
+    );
+}
+
+// --- blame / file history ---------------------------------------------------
+
+#[test]
+fn blame_attributes_lines_to_the_commit_that_changed_them() {
+    let (dir, repo) = workspace();
+    stage_file(&repo, "src/a.rs", "one\ntwo\n");
+    let first = commit(&repo, "feat: first");
+    stage_file(&repo, "src/a.rs", "one changed\ntwo\nthree\n");
+    let second = commit(&repo, "feat: second");
+
+    let window = history::file_blame(dir.path(), None, "src/a.rs", Some(1), Some(3))
+        .expect("blame worktree");
+    assert_eq!(window.total_lines, 3);
+    assert_eq!(window.lines, vec!["one changed", "two", "three"]);
+
+    let line = |start: usize| {
+        window
+            .hunks
+            .iter()
+            .find(|hunk| hunk.start_line <= start && start < hunk.start_line + hunk.lines)
+            .expect("hunk covering the line")
+    };
+    assert_eq!(line(1).commit_sha.as_deref(), Some(second.to_string().as_str()));
+    assert_eq!(line(2).commit_sha.as_deref(), Some(first.to_string().as_str()));
+    assert_eq!(line(3).commit_sha.as_deref(), Some(second.to_string().as_str()));
+
+    // Uncommitted lines come back without a commit instead of being misattributed.
+    fs::write(dir.path().join("src/a.rs"), "one changed\ntwo\nthree\nfour\n").expect("write");
+    let window = history::file_blame(dir.path(), None, "src/a.rs", Some(3), Some(4))
+        .expect("blame uncommitted");
+    assert_eq!(window.total_lines, 4);
+    let last = window
+        .hunks
+        .iter()
+        .find(|hunk| hunk.start_line + hunk.lines - 1 >= 4)
+        .expect("hunk for the uncommitted line");
+    assert!(last.commit_sha.is_none());
+    assert!(last.short_sha.is_empty());
+}
+
+#[test]
+fn blame_at_an_old_revision_uses_that_revision() {
+    let (dir, repo) = workspace();
+    stage_file(&repo, "src/a.rs", "one\ntwo\n");
+    let first = commit(&repo, "feat: first");
+    stage_file(&repo, "src/a.rs", "one\ntwo\nthree\n");
+    commit(&repo, "feat: second");
+
+    let window = history::file_blame(dir.path(), Some(&first.to_string()), "src/a.rs", None, None)
+        .expect("blame a revision");
+    assert_eq!(window.total_lines, 2);
+    assert!(window
+        .hunks
+        .iter()
+        .all(|hunk| hunk.commit_sha.as_deref() == Some(first.to_string().as_str())));
+}
+
+#[test]
+fn file_history_follows_renames() {
+    let (dir, repo) = workspace();
+    stage_file(&repo, "src/a.rs", "one\n");
+    commit(&repo, "feat: add a");
+    stage_file(&repo, "src/a.rs", "one\ntwo\n");
+    commit(&repo, "feat: grow a");
+
+    let page = history::file_history(dir.path(), None, "src/a.rs", Some(20)).expect("history");
+    assert_eq!(page.entries.len(), 2);
+    assert!(page.entries[0].summary.contains("grow a"));
+    assert!(page.follows_renames);
+
+    git_ok(dir.path(), &["mv", "src/a.rs", "src/b.rs"]);
+    git_ok(dir.path(), &["commit", "-m", "refactor: rename a to b"]);
+
+    let page = history::file_history(dir.path(), None, "src/b.rs", Some(20)).expect("renamed");
+    assert_eq!(page.entries.len(), 3, "--follow must walk through the rename");
+    assert!(page.entries[2].summary.contains("add a"));
+}
+
+#[test]
+fn file_history_of_an_untouched_path_is_empty() {
+    let (dir, _repo) = workspace();
+    let page = history::file_history(dir.path(), None, "nope.md", Some(20)).expect("history");
+    assert!(page.entries.is_empty());
+    assert!(!page.truncated);
 }

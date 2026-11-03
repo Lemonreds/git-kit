@@ -32,8 +32,10 @@ const DEFAULT_SCROLLBACK = 1000;
 const HIGH_WATER = 128 * 1024;
 const LOW_WATER = 24 * 1024;
 
-/** ANSI palettes. Chrome colours come from the CSS variables; only the 16 ANSI
- *  slots are literal here, because xterm parses them as concrete colours. */
+/** Windows/Linux get Ctrl+X; macOS gets ⌘X (Ctrl+X stays with the shell). */
+const IS_MAC = /Mac|iPhone|iPad/i.test(navigator.userAgent);
+
+/** ANSI palette. Chrome colours are literal too: the terminal is always light. */
 const ANSI_LIGHT = {
   black: "#2f2f34",
   red: "#c72e26",
@@ -51,25 +53,6 @@ const ANSI_LIGHT = {
   brightMagenta: "#b356d4",
   brightCyan: "#19a6b4",
   brightWhite: "#ffffff",
-};
-
-const ANSI_DARK = {
-  black: "#2f2f34",
-  red: "#ff6f66",
-  green: "#45c96b",
-  yellow: "#e0a75a",
-  blue: "#5a94ff",
-  magenta: "#c77dff",
-  cyan: "#4ec9d4",
-  white: "#d8d8dd",
-  brightBlack: "#6b6b73",
-  brightRed: "#ff918a",
-  brightGreen: "#6fdc8c",
-  brightYellow: "#f0c07a",
-  brightBlue: "#8ab4ff",
-  brightMagenta: "#dda6ff",
-  brightCyan: "#7fe0e8",
-  brightWhite: "#f2f2f4",
 };
 
 export interface TerminalMountOptions {
@@ -103,39 +86,27 @@ interface Attachment {
 
 const attachments = new Map<string, Attachment>();
 
-function cssVar(name: string, fallback: string): string {
-  const value = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
-  return value || fallback;
-}
-
-function prefersDark(): boolean {
-  return document.documentElement.dataset.theme === "dark";
-}
+/**
+ * The terminal is deliberately theme-independent: the app theme no longer touches
+ * it (a dark palette inside a light shell, or the reverse, has bitten us more
+ * than once). One literal light palette, always.
+ */
+const TERMINAL_THEME: XtermTheme = {
+  background: "#ffffff",
+  foreground: "#1c1c1e",
+  cursor: "#2f6feb",
+  cursorAccent: "#ffffff",
+  selectionBackground: "rgba(47,111,235,0.22)",
+  ...ANSI_LIGHT,
+};
 
 function terminalTheme(): XtermTheme {
-  const dark = prefersDark();
-  return {
-    background: cssVar("--gk-panel", dark ? "#1c1c1f" : "#ffffff"),
-    foreground: cssVar("--gk-ink", dark ? "#f2f2f4" : "#1c1c1e"),
-    cursor: cssVar("--gk-accent", dark ? "#5a94ff" : "#2f6feb"),
-    cursorAccent: cssVar("--gk-panel", dark ? "#1c1c1f" : "#ffffff"),
-    selectionBackground: dark ? "rgba(90,148,255,0.30)" : "rgba(47,111,235,0.22)",
-    ...(dark ? ANSI_DARK : ANSI_LIGHT),
-  };
+  return TERMINAL_THEME;
 }
 
 export function scrollbackSetting(): number {
   const raw = Number(localStorage.getItem(SCROLLBACK_KEY));
   return Number.isFinite(raw) && raw >= 200 ? Math.round(raw) : DEFAULT_SCROLLBACK;
-}
-
-/** Recolouring on a light/dark switch: a theme write, not a rebuild. */
-export function applyTerminalTheme(): void {
-  for (const attachment of attachments.values()) {
-    if (attachment.term && !attachment.disposed) {
-      attachment.term.options.theme = terminalTheme();
-    }
-  }
 }
 
 /** Whether a live xterm exists for this session (the panel uses it for the badge). */
@@ -219,6 +190,18 @@ export async function attachTerminal(
 
   attachment.term = term;
   attachment.fit = fitAddon;
+
+  // ⌘X (macOS) / Ctrl+X (Windows) drops the command line the user has typed so
+  // far. The shell's readline binding for a whole-line kill is Ctrl+U, so that is
+  // what gets sent; returning `false` stops xterm from forwarding its own `\x18`.
+  term.attachCustomKeyEventHandler((event) => {
+    if (event.type !== "keydown" || event.key.toLowerCase() !== "x") return true;
+    const clear = IS_MAC ? event.metaKey && !event.ctrlKey : event.ctrlKey && !event.metaKey;
+    if (!clear) return true;
+    event.preventDefault();
+    clearTerminalInput(key);
+    return false;
+  });
 
   term.onData((data) => {
     if (attachment.rustId) {
@@ -367,6 +350,13 @@ export function clearTerminal(key: string): void {
   if (attachment.rustId) {
     void api.terminalWrite(attachment.rustId, "\u000c").catch(() => undefined);
   }
+}
+
+/** Kill the current command line (Ctrl+U) without touching the scrollback. */
+export function clearTerminalInput(key: string): void {
+  const attachment = attachments.get(key);
+  if (!attachment?.rustId) return;
+  void api.terminalWrite(attachment.rustId, "\u0015").catch(() => undefined);
 }
 
 export function writeTerminal(key: string, data: string): void {

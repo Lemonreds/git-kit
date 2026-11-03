@@ -49,6 +49,7 @@ export default function ChangesPanel() {
   }));
 
   const openDiff = useAppStore((state) => state.openWorktreeDiff);
+  const openConflict = useAppStore((state) => state.openConflict);
   const stageFile = useAppStore((state) => state.stageFile);
   const unstageFile = useAppStore((state) => state.unstageFile);
   const discardFile = useAppStore((state) => state.discardFile);
@@ -152,6 +153,7 @@ export default function ChangesPanel() {
                   onStage={() => void stageFile(entry.path)}
                   onUnstage={() => void unstageFile(entry.path)}
                   onDiscard={() => setPendingDiscard(entry)}
+                  onResolve={entry.conflicted ? () => void openConflict(entry.path) : undefined}
                   onIgnore={
                     side === "unstaged" && entry.unstaged === "untracked" && !entry.conflicted
                       ? () => void ignorePath(entry.path, false)
@@ -223,8 +225,17 @@ export default function ChangesPanel() {
         ) : (
           <>
             {conflicted.length > 0 ? (
-              <div className="mb-2 rounded-lg border border-negative/30 bg-negative/8 px-2 py-1.5 text-[11px] text-negative">
-                {t("changes.conflictBanner", { count: conflicted.length })}
+              <div className="mb-2 flex items-center gap-2 rounded-lg border border-negative/30 bg-negative/8 px-2 py-1.5 text-[11px] text-negative">
+                <span className="min-w-0 flex-1">
+                  {t("changes.conflictBanner", { count: conflicted.length })}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => void openConflict(conflicted[0].path)}
+                  className="shrink-0 rounded-md border border-negative/40 px-1.5 py-0.5 text-[10.5px] font-medium text-negative transition-colors hover:bg-negative/12"
+                >
+                  {t("conflict.title")}
+                </button>
               </div>
             ) : null}
             {renderGroup("conflicted", t("changes.conflict"), conflicted, "unstaged")}

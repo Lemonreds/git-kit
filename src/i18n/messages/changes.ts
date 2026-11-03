@@ -63,6 +63,9 @@ export const zh = {
   "changes.amendSubmit": "修正提交",
   "changes.commitSubmit": "提交",
   "changes.amendToggle": "修正上一次提交（amend）",
+  "changes.skipHooksToggle": "跳过提交前置检查（-n）",
+  "changes.skipHooksHelp":
+    "加 --no-verify：跳过 pre-commit / commit-msg 钩子，适合钩子报错却又暂时提交不下去时使用；默认不跳过。",
   "changes.amendFilesPreview": "{count} 个文件",
   "changes.amendFilesPushedPreview": "{count} 个文件 · 已推送",
   "changes.amendPushedToast": "该提交已推送过，修正后需要强制推送",
@@ -158,6 +161,9 @@ export const en: Record<keyof typeof zh, Message> = {
   "changes.amendSubmit": "Amend commit",
   "changes.commitSubmit": "Commit",
   "changes.amendToggle": "Amend the last commit (amend)",
+  "changes.skipHooksToggle": "Skip commit hooks (-n)",
+  "changes.skipHooksHelp":
+    "Adds --no-verify, skipping the pre-commit / commit-msg hooks. Useful when a hook keeps failing and you still need the commit; off by default.",
   "changes.amendFilesPreview": { one: "{count} file", other: "{count} files" },
   "changes.amendFilesPushedPreview": {
     one: "{count} file - pushed",

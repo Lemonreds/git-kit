@@ -160,6 +160,68 @@ User opens terminal → terminalSlice.openTerminal()
 **Performance**: Large repos (>10GB) may lag, diff limited to 10MB files  
 **Platforms**: macOS + Windows only (Linux planned)
 
+**Files**:
+- `src/components/conflict/ConflictPanel.tsx` — conflict resolver view (header, batch actions, special states)
+- `src/components/conflict/ConflictBlockCard.tsx` — one conflict block (sides + editable result)
+- `src/components/conflict/ConflictSidePanel.tsx` — read-only side of a block, line `+` picker
+- `src/components/history/FileHistoryPanel.tsx` — diff / history / blame tabs of one file
+- `src/components/history/VirtualHistoryList.tsx`, `VirtualBlameList.tsx` — virtualised lists
+- `src/store/slices/conflictSlice.ts`, `src/store/slices/fileHistorySlice.ts` — state + IPC orchestration
+- `src/lib/parseConflicts.ts` — conflict marker parser / assembler (pure functions)
+- `src-tauri/src/git/conflict.rs` — conflict stages read + resolution write
+- `src-tauri/src/git/history.rs` — blame windows + rename-following file history
+
+### Conflict Resolution (§3.4)
+
+**Responsibilities**: read the three index stages of a conflicted path, let the user resolve it block by block in the diff column, write the result back atomically and stage it.
+
+**Data flow (read)**:
+```
+ChangesPanel / RepoStateBanner → openConflict(path)
+  → list_conflicts        (one index.conflicts() walk: kind + stages)
+  → get_conflict_file     (ours / theirs / ancestor blobs + worktree text + eol + labels)
+  → parseConflictFile()   (single pass, blocks = line ranges, one copy of the text)
+  → ConflictPanel         (drafts only; nothing is written until Save)
+```
+
+**Data flow (write)**:
+```
+Save → assembleConflictFile(parsed, drafts)
+  → resolve_conflict(path, content)
+  → validate path is still conflicted → atomic write (temp + rename) → git add -- <path>
+  → RepoOperationState → refreshChanges + next conflicted file
+```
+
+**Caps**: 1.5 MB / 40k lines per side (`complete=false` disables block editing and saving),
+2000-line blame windows, 500 history rows.
+
+### File History / Blame (§3.5)
+
+**Responsibilities**: list the commits that touched one path and attribute every line of it.
+
+**Data flow**:
+```
+DiffPanel header → openFileHistory(path, rev)
+  → file_history (git log --follow, bounded) → virtualised commit list
+  → selectHistoryCommit → get_file_diff(sha, path) → DiffViewer
+
+Blame tab → file_blame(path, start, end, rev) → window of hunks + line texts
+  → mergeHunks / mergeLines → VirtualBlameList (window requested near the end)
+```
+
+**Why the CLI here**:
+- `git blame --line-porcelain -L a,b` abouts an *arbitrary revision* correctly. libgit2's
+  `blame_file` always reads the working-directory copy, so blaming an older commit through
+  it would attribute lines of a different file version.
+- `git log --follow` follows renames; a revwalk + per-commit tree diff cannot, and would be
+  far slower on a long history.
+
+### Diff column view priority
+
+The right column is one surface with four owners, resolved in this order:
+`conflict → file history → worktree diff → commit diff`. `clearDetail()` closes the first two
+when the repository context changes (project switch, pane switch, back-to-branches).
+
 ---
 
 **Related**: [development.md](./development.md) | [conventions.md](./conventions.md)

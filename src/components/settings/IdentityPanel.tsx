@@ -10,15 +10,17 @@ import { tip } from "../common/Tooltip";
 
 const SOURCE_META: Record<
   ConfigSource,
-  { label: MessageKey; className: string; hint: MessageKey }
+  { label: MessageKey | null; className: string; hint: MessageKey }
 > = {
   local: {
     label: "settings.identity.source.local",
     className: "border-accent/40 bg-accent-soft text-accent",
     hint: "settings.identity.source.localHint",
   },
+  // Inherited from the global config: shown as "nothing set here", without
+  // naming that config — the panel only ever writes the repository's own one.
   global: {
-    label: "settings.identity.source.global",
+    label: null,
     className: "border-line bg-canvas text-ink-faint",
     hint: "settings.identity.source.globalHint",
   },
@@ -90,12 +92,14 @@ export default function IdentityPanel() {
           <label className="block">
             <span className="mb-1 flex items-center justify-between text-[11.5px] font-medium text-ink-soft">
               {t("settings.identity.nameLabel")}
-              <span
-                {...tip(t(nameSource.hint))}
-                className={`rounded border px-1 py-px text-[9px] font-medium ${nameSource.className}`}
-              >
-                {t(nameSource.label)}
-              </span>
+              {nameSource.label ? (
+                <span
+                  {...tip(t(nameSource.hint))}
+                  className={`rounded border px-1 py-px text-[9px] font-medium ${nameSource.className}`}
+                >
+                  {t(nameSource.label)}
+                </span>
+              ) : null}
             </span>
             <input
               value={name}
@@ -109,12 +113,14 @@ export default function IdentityPanel() {
           <label className="block">
             <span className="mb-1 flex items-center justify-between text-[11.5px] font-medium text-ink-soft">
               {t("settings.identity.emailLabel")}
-              <span
-                {...tip(t(emailSource.hint))}
-                className={`rounded border px-1 py-px text-[9px] font-medium ${emailSource.className}`}
-              >
-                {t(emailSource.label)}
-              </span>
+              {emailSource.label ? (
+                <span
+                  {...tip(t(emailSource.hint))}
+                  className={`rounded border px-1 py-px text-[9px] font-medium ${emailSource.className}`}
+                >
+                  {t(emailSource.label)}
+                </span>
+              ) : null}
             </span>
             <input
               value={email}

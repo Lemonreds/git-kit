@@ -48,6 +48,12 @@ pub enum AppError {
     StashConflict(String),
 
     #[error("{0}")]
+    ConflictInvalid(String),
+
+    #[error("{0}")]
+    BlameUnavailable(String),
+
+    #[error("{0}")]
     RemoteInvalid(String),
 
     #[error("{0}")]
@@ -93,6 +99,8 @@ impl AppError {
             AppError::MergeConflict(_) => "merge_conflict",
             AppError::RevertConflict(_) => "revert_conflict",
             AppError::StashConflict(_) => "stash_conflict",
+            AppError::ConflictInvalid(_) => "conflict_invalid",
+            AppError::BlameUnavailable(_) => "blame_unavailable",
             AppError::RemoteInvalid(_) => "remote_invalid",
             AppError::ConfigInvalid(_) => "config_invalid",
             AppError::PushRejected(_) => "push_rejected",

@@ -119,6 +119,18 @@ export const zh = {
   // Terminal
   "store.projectUnavailable": "该项目当前不可用，无法打开终端",
   "store.selectProjectFirst": "请先选择一个项目",
+
+  // Conflict resolution
+  "store.loadConflictsFailed": "读取冲突文件列表失败",
+  "store.loadConflictFailed": "读取冲突文件内容失败",
+  "store.conflictSaved": "已解决并暂存 {path}",
+  "store.conflictAllSaved": "全部冲突已解决，可以继续当前操作",
+  "store.saveConflictFailed": "保存冲突解决结果失败",
+  "store.conflictUnresolvedFirst": "还有 {count} 个冲突块未解决，请先处理或手动点「保存并暂存」",
+
+  // File history / blame
+  "store.loadFileHistoryFailed": "读取文件历史失败",
+  "store.loadBlameFailed": "读取 Blame 失败",
 } satisfies Record<string, Message>;
 
 export const en: Record<keyof typeof zh, Message> = {
@@ -258,4 +270,15 @@ export const en: Record<keyof typeof zh, Message> = {
 
   "store.projectUnavailable": "This project is unavailable, so no terminal can be opened",
   "store.selectProjectFirst": "Select a project first",
+
+  "store.loadConflictsFailed": "Could not load the conflicted files",
+  "store.loadConflictFailed": "Could not read the conflicted file",
+  "store.conflictSaved": "Resolved and staged {path}",
+  "store.conflictAllSaved": "All conflicts are resolved, the operation can continue",
+  "store.saveConflictFailed": "Could not save the resolution",
+  "store.conflictUnresolvedFirst":
+    "{count} conflict blocks are still unresolved; resolve them or use Save and stage explicitly",
+
+  "store.loadFileHistoryFailed": "Could not load the file history",
+  "store.loadBlameFailed": "Could not load the blame",
 };

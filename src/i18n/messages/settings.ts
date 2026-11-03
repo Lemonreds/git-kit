@@ -21,7 +21,7 @@ export const zh = {
   "settings.subtitle.templates": "所有仓库公用",
 
   "settings.appearance.theme": "主题",
-  "settings.appearance.themeHint": "默认浅色。深色主题会同时应用于终端与窗口标题栏。",
+  "settings.appearance.themeHint": "切换后立即生效，不需要重启。默认浅色。",
   "settings.appearance.light": "浅色",
   "settings.appearance.dark": "深色",
   "settings.appearance.language": "界面语言",
@@ -60,7 +60,7 @@ export const zh = {
 
   "settings.identity.sectionTitle": "当前仓库的提交身份",
   "settings.identity.help":
-    "只写入当前仓库的 .git/config（git config --local），不会修改全局配置，也不影响其它仓库；保存后本仓库新的提交会用这个身份。",
+    "只写入当前仓库的 .git/config（git config --local），不会改动其它仓库；保存后本仓库新的提交会用这个身份。",
   "settings.identity.loading": "正在读取提交身份…",
   "settings.identity.nameLabel": "提交用户名",
   "settings.identity.namePlaceholder": "例如：Zhang San",
@@ -69,10 +69,9 @@ export const zh = {
   "settings.identity.source.local": "本地",
   "settings.identity.source.localHint": "来自当前仓库的 .git/config",
   "settings.identity.source.global": "全局",
-  "settings.identity.source.globalHint":
-    "本地未设置，当前生效值来自全局配置；保存后会写入本仓库 .git/config",
+  "settings.identity.source.globalHint": "本仓库未单独设置，当前生效值来自已有配置；保存后会写入本仓库 .git/config",
   "settings.identity.source.none": "未设置",
-  "settings.identity.source.noneHint": "本地与全局都没有配置，提交会被 git 拒绝",
+  "settings.identity.source.noneHint": "当前没有任何生效的提交身份，提交会被 git 拒绝",
 
   "settings.templates.empty": "还没有模板，新建一个即可。",
   "settings.templates.untitled": "未命名模板",
@@ -118,7 +117,7 @@ export const en: Record<keyof typeof zh, Message> = {
   "settings.subtitle.templates": "Shared by every repository",
 
   "settings.appearance.theme": "Theme",
-  "settings.appearance.themeHint": "Light by default. The dark theme also applies to the terminal and the window title bar.",
+  "settings.appearance.themeHint": "Takes effect immediately, no restart needed. Light by default.",
   "settings.appearance.light": "Light",
   "settings.appearance.dark": "Dark",
   "settings.appearance.language": "Language",
@@ -163,7 +162,7 @@ export const en: Record<keyof typeof zh, Message> = {
 
   "settings.identity.sectionTitle": "Commit identity for this repository",
   "settings.identity.help":
-    "Only writes this repository's .git/config (git config --local). The global config and other repositories are untouched; new commits here use this identity once saved.",
+    "Only writes this repository's .git/config (git config --local); no other repository is touched. New commits here use this identity once saved.",
   "settings.identity.loading": "Loading commit identity...",
   "settings.identity.nameLabel": "Commit user name",
   "settings.identity.namePlaceholder": "e.g. Zhang San",
@@ -173,10 +172,9 @@ export const en: Record<keyof typeof zh, Message> = {
   "settings.identity.source.localHint": "From this repository's .git/config",
   "settings.identity.source.global": "Global",
   "settings.identity.source.globalHint":
-    "Not set locally, so the effective value comes from the global config. Saving writes it to this repository's .git/config.",
+    "Not set for this repository, so the effective value comes from the existing config. Saving writes it to this repository's .git/config.",
   "settings.identity.source.none": "Not set",
-  "settings.identity.source.noneHint":
-    "Set neither locally nor globally, so git will refuse to commit",
+  "settings.identity.source.noneHint": "No commit identity is in effect, so git will refuse to commit",
 
   "settings.templates.empty": "No templates yet. Create one to get started.",
   "settings.templates.untitled": "Untitled template",

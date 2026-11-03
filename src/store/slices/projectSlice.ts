@@ -36,7 +36,15 @@ export interface ProjectSlice {
   removeProject: (id: string) => Promise<void>;
   pinProject: (id: string, pinned: boolean) => Promise<void>;
   setProjectSort: (sort: ProjectSort) => void;
+  /** A repository refresh (manual ⌘R or the window regaining focus) is running. */
+  refreshing: boolean;
   refresh: () => Promise<void>;
+  /**
+   * Light, non-destructive re-read when the window goes inactive → active: the
+   * user may have committed / checked out / fetched from another app, so the
+   * lists are stale, but the open commit and diff must survive.
+   */
+  syncOnFocus: () => Promise<void>;
 }
 
 /** Project list, the active repository and everything that opens / closes one. */
@@ -78,6 +86,7 @@ export const createProjectSlice: StateCreator<AppState, [], [], ProjectSlice> = 
     activeProject: null,
     addingProject: false,
     relinkingId: null,
+    refreshing: false,
 
     async bootstrap() {
       if (get().booted) return;
@@ -277,6 +286,8 @@ export const createProjectSlice: StateCreator<AppState, [], [], ProjectSlice> = 
     },
 
     async refresh() {
+      if (get().refreshing) return;
+      set({ refreshing: true });
       invalidateCaches();
       try {
         const list = await api.listProjects();
@@ -289,7 +300,60 @@ export const createProjectSlice: StateCreator<AppState, [], [], ProjectSlice> = 
         notify("info", t("store.refreshed"));
       } catch (error) {
         fail(t("store.refreshFailed"), error);
+      } finally {
+        set({ refreshing: false });
       }
+    },
+
+    async syncOnFocus() {
+      const project = get().activeProject;
+      if (!project || project.status !== "ok" || get().refreshing) return;
+
+      // No `token` bump: a `loadProject` that is still in flight owns the state.
+      // Read the epoch instead and drop the answer if it moved on.
+      const epoch = token.project;
+      set({ refreshing: true });
+      const [snapshot, branches, changes] = await Promise.allSettled([
+        api.repoSnapshot(project.path),
+        api.listBranches(project.path),
+        api.worktreeStatus(project.path),
+      ]);
+      if (epoch !== token.project) {
+        set({ refreshing: false });
+        return;
+      }
+
+      // Every list keeps its previous value when its own read failed: one bad
+      // command must not blank the whole sidebar.
+      set((state) => {
+        const nextSnapshot = snapshot.status === "fulfilled" ? snapshot.value : state.snapshot;
+        const nextChanges = changes.status === "fulfilled" ? changes.value : state.changes;
+        return {
+          snapshot: nextSnapshot
+            ? { ...nextSnapshot, isDirty: nextChanges ? nextChanges.entries.length > 0 : nextSnapshot.isDirty }
+            : nextSnapshot,
+          changes: nextChanges,
+          branches: branches.status === "fulfilled" ? branches.value : state.branches,
+          projects:
+            state.activeProject && nextSnapshot
+              ? state.projects.map((item) =>
+                  item.id === state.activeProject?.id
+                    ? {
+                        ...item,
+                        url: nextSnapshot.url,
+                        remoteHost: nextSnapshot.remoteHost,
+                        headBranch: nextSnapshot.headBranch,
+                        status: "ok" as const,
+                        statusHint: undefined,
+                      }
+                    : item,
+                )
+              : state.projects,
+        };
+      });
+      set({ refreshing: false });
+      void get().refreshRepoState();
+      if (get().pane === "tags") void get().refreshTags();
     },
   };
 };

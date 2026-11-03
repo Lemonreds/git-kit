@@ -302,23 +302,7 @@ pub(crate) fn conflict_paths(repo_path: &Path) -> Vec<String> {
     let Ok(repo) = open(repo_path) else {
         return Vec::new();
     };
-    let Ok(index) = repo.index() else {
-        return Vec::new();
-    };
-    let Ok(conflicts) = index.conflicts() else {
-        return Vec::new();
-    };
-
-    let mut paths: Vec<String> = conflicts
-        .flatten()
-        .filter_map(|conflict| {
-            let entry = conflict.our.or(conflict.their);
-            entry.map(|entry| String::from_utf8_lossy(&entry.path).to_string())
-        })
-        .collect();
-    paths.sort();
-    paths.dedup();
-    paths
+    super::conflict::conflict_paths(&repo)
 }
 
 pub fn cherry_pick(
@@ -1319,7 +1303,15 @@ pub fn fetch_all(repo_path: &Path) -> Result<FetchAllResult, AppError> {
 /// Commit the index as-is (never `-a`): what the user staged is what gets
 /// committed. GPG signing is disabled for the same reason as squash — a signing
 /// prompt would block the app because there is no terminal attached.
-pub fn commit_staged(repo_path: &Path, message: &str) -> Result<CommitResult, AppError> {
+///
+/// `no_verify` adds `--no-verify`, which skips `pre-commit` / `commit-msg`. It is
+/// opt-in per commit: a hook that hangs (lint server, signing helper) would
+/// otherwise leave the dialog spinning with no way out.
+pub fn commit_staged(
+    repo_path: &Path,
+    message: &str,
+    no_verify: bool,
+) -> Result<CommitResult, AppError> {
     let message = message.trim();
     if message.is_empty() {
         return Err(AppError::message("提交信息不能为空"));
@@ -1341,7 +1333,13 @@ pub fn commit_staged(repo_path: &Path, message: &str) -> Result<CommitResult, Ap
         .and_then(|head| head.target())
         .map(|oid| oid.to_string());
 
-    run_blocking(repo_path, &["commit", "--no-gpg-sign", "-m", message]).map_err(|error| {
+    let mut args: Vec<&str> = vec!["commit", "--no-gpg-sign"];
+    if no_verify {
+        args.push("--no-verify");
+    }
+    args.extend(["-m", message]);
+
+    run_blocking(repo_path, &args).map_err(|error| {
         let detail = command_detail(&error);
         let lower = detail.to_ascii_lowercase();
         if lower.contains("unmerged") || lower.contains("conflict") {

@@ -4,16 +4,16 @@ use std::sync::Mutex;
 use tauri::State;
 
 use crate::error::AppError;
-use crate::git::{branches, commits, config, diff, ops, repo as git_repo, status, workflow};
+use crate::git::{branches, commits, config, conflict, diff, history, ops, repo as git_repo, status, workflow};
 use crate::model::{
-    AppSettings, BranchSummary, BranchTemplate, CheckoutResult, CherryPickResult, CommitDetail,
-    CommitFiles, CommitPage, CommitResult, ComparePreview, CreateBranchResult,
-    DeleteBranchesResult, DeleteTagResult, FetchAllResult, FileDiff, HeadCommitPreview,
-    MergePreview, MergeResult, ProjectList, ProjectStatus, ProjectView, PullPreview, PullResult,
-    PushAllTagsResult, PushPreview, PushResult, RebasePreview, RebaseResult, ReflogEntry,
-    RemoteBranchPage, RemoteInfo, RemoteTagPage, RemoveRemoteResult, RepoIdentity,
-    RepoOperationState, RepoSnapshot, ResetResult, SquashPreview, SquashResult, StashList,
-    SyncResult, TagInfo, WorktreeStatus,
+    AppSettings, BlameWindow, BranchSummary, BranchTemplate, CheckoutResult, CherryPickResult,
+    CommitDetail, CommitFiles, CommitPage, CommitResult, ComparePreview, ConflictFile,
+    ConflictFileDetail, CreateBranchResult, DeleteBranchesResult, DeleteTagResult,
+    FetchAllResult, FileDiff, FileHistoryPage, HeadCommitPreview, MergePreview, MergeResult,
+    ProjectList, ProjectStatus, ProjectView, PullPreview, PullResult, PushAllTagsResult,
+    PushPreview, PushResult, RebasePreview, RebaseResult, ReflogEntry, RemoteBranchPage,
+    RemoteInfo, RemoteTagPage, RemoveRemoteResult, RepoIdentity, RepoOperationState, RepoSnapshot,
+    ResetResult, SquashPreview, SquashResult, StashList, SyncResult, TagInfo, WorktreeStatus,
 };
 use crate::project_store::{ProjectRecord, ProjectStore};
 use crate::settings::SettingsStore;
@@ -551,10 +551,19 @@ pub fn push_branch(
     )
 }
 
-/// Commit whatever is currently in the index.
+/// Commit whatever is currently in the index. `no_verify` skips the repo hooks
+/// (same as `git commit -n`).
 #[tauri::command(async)]
-pub fn commit_staged(repo_path: String, message: String) -> Result<CommitResult, AppError> {
-    ops::commit_staged(std::path::Path::new(&repo_path), &message)
+pub fn commit_staged(
+    repo_path: String,
+    message: String,
+    no_verify: Option<bool>,
+) -> Result<CommitResult, AppError> {
+    ops::commit_staged(
+        std::path::Path::new(&repo_path),
+        &message,
+        no_verify.unwrap_or(false),
+    )
 }
 
 #[tauri::command(async)]
@@ -574,6 +583,82 @@ pub fn fetch_all(repo_path: String) -> Result<FetchAllResult, AppError> {
 pub fn get_repo_state(repo_path: String) -> Result<RepoOperationState, AppError> {
     let repo = git_repo::open_repo(&repo_path)?;
     Ok(workflow::repo_state(&repo))
+}
+
+// --- conflict resolution ---------------------------------------------------
+
+/// Every path with an unresolved index conflict, without reading any blob.
+#[tauri::command(async)]
+pub fn list_conflicts(repo_path: String) -> Result<Vec<ConflictFile>, AppError> {
+    let repo = git_repo::open_repo(&repo_path)?;
+    conflict::list_conflicts(&repo)
+}
+
+/// The three versions of one conflicted file plus the current worktree copy.
+#[tauri::command(async)]
+pub fn get_conflict_file(
+    repo_path: String,
+    path: String,
+) -> Result<ConflictFileDetail, AppError> {
+    let repo = git_repo::open_repo(&repo_path)?;
+    conflict::conflict_file(&repo, &path)
+}
+
+/// Write the resolved text back and stage it (`git add -- <path>`).
+#[tauri::command(async)]
+pub fn resolve_conflict(
+    repo_path: String,
+    path: String,
+    content: String,
+) -> Result<RepoOperationState, AppError> {
+    conflict::resolve_conflict(std::path::Path::new(&repo_path), &path, &content)
+}
+
+/// Accept one whole side (`ours` / `theirs`) or delete the path.
+#[tauri::command(async)]
+pub fn resolve_conflict_side(
+    repo_path: String,
+    path: String,
+    side: String,
+) -> Result<RepoOperationState, AppError> {
+    conflict::resolve_conflict_side(std::path::Path::new(&repo_path), &path, &side)
+}
+
+// --- blame / file history --------------------------------------------------
+
+/// Blame one window of lines. No `rev` blames the working-tree file (so
+/// uncommitted lines show up as such), a `rev` blames that revision.
+#[tauri::command(async)]
+pub fn file_blame(
+    repo_path: String,
+    rev: Option<String>,
+    path: String,
+    start_line: Option<usize>,
+    end_line: Option<usize>,
+) -> Result<BlameWindow, AppError> {
+    history::file_blame(
+        std::path::Path::new(&repo_path),
+        rev.as_deref(),
+        &path,
+        start_line,
+        end_line,
+    )
+}
+
+/// Commits that touched a path, following renames.
+#[tauri::command(async)]
+pub fn file_history(
+    repo_path: String,
+    rev: Option<String>,
+    path: String,
+    limit: Option<usize>,
+) -> Result<FileHistoryPage, AppError> {
+    history::file_history(
+        std::path::Path::new(&repo_path),
+        rev.as_deref(),
+        &path,
+        limit,
+    )
 }
 
 /// `action` is `continue` / `skip` / `abort`.

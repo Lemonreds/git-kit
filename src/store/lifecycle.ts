@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 
 import { setTerminalsWindowHidden } from "../lib/terminal";
+import { useAppStore } from "./appStore";
 import { releaseTransientCaches } from "./shared";
 
 /**
@@ -15,6 +16,10 @@ import { releaseTransientCaches } from "./shared";
  * logging in the background must not keep filling scrollback nobody is looking
  * at. Rust then keeps only the tail of the stream (see `terminal.rs`), so the
  * shell never blocks and memory stops growing.
+ *
+ * Coming back is the mirror image: git may have moved while another window was
+ * in front (a commit in the terminal, a checkout in Finder), so the lists are
+ * re-read once — silently, and without touching the open commit / diff.
  */
 export function useMemoryHygiene() {
   useEffect(() => {
@@ -22,8 +27,28 @@ export function useMemoryHygiene() {
       const hidden = document.visibilityState === "hidden";
       if (hidden) releaseTransientCaches();
       setTerminalsWindowHidden(hidden);
+      if (!hidden) syncGit();
     };
+
+    const syncGit = () => {
+      // A dialog owns the window: refreshing under it would fight the user's
+      // pending input (identity form, commit message).
+      if (document.visibilityState === "hidden") return;
+      if (document.querySelector('[data-modal="true"]')) return;
+      const store = useAppStore.getState();
+      if (!store.booted) return;
+      // A native folder sheet is mid-flow: the project is about to be reloaded.
+      if (store.addingProject || store.relinkingId) return;
+      void store.syncOnFocus();
+    };
+
+    // `focus` fires for the native window, `visibilitychange` for tab/page level
+    // hiding; both can happen for one switch, and `syncOnFocus` de-duplicates.
+    window.addEventListener("focus", syncGit);
     document.addEventListener("visibilitychange", onVisibilityChange);
-    return () => document.removeEventListener("visibilitychange", onVisibilityChange);
+    return () => {
+      window.removeEventListener("focus", syncGit);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+    };
   }, []);
 }

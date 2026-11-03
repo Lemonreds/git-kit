@@ -1,4 +1,4 @@
-import { ChevronDown, Eraser, Plus, SquareTerminal, X } from "lucide-react";
+import { ChevronDown, Eraser, GitBranch, Plus, SquareTerminal, X } from "lucide-react";
 
 import { useT } from "../../i18n";
 import { clearTerminal } from "../../lib/terminal";
@@ -18,12 +18,16 @@ import TerminalView from "./TerminalView";
  */
 export default function TerminalPanel() {
   const t = useT();
-  const { terminals, activeTerminalId, terminalOpen, activeProject } = useSlice((state) => ({
-    terminals: state.terminals,
-    activeTerminalId: state.activeTerminalId,
-    terminalOpen: state.terminalOpen,
-    activeProject: state.activeProject,
-  }));
+  const { terminals, activeTerminalId, terminalOpen, activeProject, projects, branches, snapshot } =
+    useSlice((state) => ({
+      terminals: state.terminals,
+      activeTerminalId: state.activeTerminalId,
+      terminalOpen: state.terminalOpen,
+      activeProject: state.activeProject,
+      projects: state.projects,
+      branches: state.branches,
+      snapshot: state.snapshot,
+    }));
 
   const activateTerminal = useAppStore((state) => state.activateTerminal);
   const closeTerminal = useAppStore((state) => state.closeTerminal);
@@ -32,6 +36,15 @@ export default function TerminalPanel() {
 
   const active = terminals.find((tab) => tab.id === activeTerminalId) ?? null;
   const canOpenCurrent = activeProject?.status === "ok";
+
+  // The branch the shell is sitting on. It follows the *active tab*, not the
+  // sidebar selection: a terminal for another project keeps its own branch.
+  const sameProject = active !== null && active.projectId === activeProject?.id;
+  const branchName = active
+    ? sameProject
+      ? (snapshot?.headBranch ?? branches.find((item) => item.isHead)?.name ?? null)
+      : (projects.find((item) => item.id === active.projectId)?.headBranch ?? null)
+    : null;
 
   return (
     <section
@@ -96,6 +109,15 @@ export default function TerminalPanel() {
         </div>
 
         <div className="flex shrink-0 items-center gap-0.5">
+          {branchName ? (
+            <span
+              {...tip(t("terminal.branchTip", { branch: branchName }))}
+              className="mr-1 flex max-w-[180px] min-w-0 items-center gap-1 rounded-md border border-line/70 bg-canvas/50 px-1.5 py-[2px] text-ink-soft"
+            >
+              <GitBranch size={10} className="shrink-0 text-ink-faint" />
+              <span className="truncate font-mono text-[10.5px]">{branchName}</span>
+            </span>
+          ) : null}
           <IconButton
             label={t("terminal.openInCurrent")}
             size="sm"

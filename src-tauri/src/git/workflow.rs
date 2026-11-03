@@ -51,8 +51,8 @@ fn read_counter(path: PathBuf) -> Option<String> {
 /// Detect a merge / rebase / cherry-pick / revert that stopped mid-way.
 pub fn repo_state(repo: &Repository) -> RepoOperationState {
     let dir = git_dir(repo);
-    let path = dir.display().to_string();
-    let conflicts = conflict_paths(Path::new(&path));
+    // One index walk feeds both the banner and the resolver's file list.
+    let conflicts = super::conflict::conflict_paths(repo);
 
     let rebase_merge = dir.join("rebase-merge");
     let rebase_apply = dir.join("rebase-apply");

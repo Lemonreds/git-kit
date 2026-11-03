@@ -1,10 +1,12 @@
 import { useEffect, useRef, useState } from "react";
 import {
+  AlertTriangle,
   ClipboardCopy,
   Columns2,
   Copy,
   FileDiff as FileDiffIcon,
   GitCommitHorizontal,
+  History,
   Info,
   Loader2,
   Plus,
@@ -20,15 +22,18 @@ import { useT } from "../../i18n";
 import { api } from "../../lib/ipc";
 import type { CommitDetail } from "../../lib/types";
 
-import { absoluteTime, copyText, formatCount, timeTooltip } from "../../lib/format";
+import { absoluteTime, copyText, formatCount, relativeTime, timeTooltip } from "../../lib/format";
 import { useAppStore } from "../../store/appStore";
 import { useSlice } from "../../store/hooks";
 import ConfirmDialog from "../common/ConfirmDialog";
 import EmptyState from "../common/EmptyState";
 import IconButton from "../common/IconButton";
+import RowMenu from "../common/RowMenu";
 import ShaChip from "../common/ShaChip";
 import { SkeletonRows } from "../common/Skeleton";
 import { tip } from "../common/Tooltip";
+import ConflictPanel from "../conflict/ConflictPanel";
+import FileHistoryPanel from "../history/FileHistoryPanel";
 import DiffSearch from "./DiffSearch";
 import DiffViewer from "./DiffViewer";
 import FileChangeList from "./FileChangeList";
@@ -69,6 +74,18 @@ export default function DiffPanel() {
   const notify = useAppStore((state) => state.notify);
   const showAlert = useAppStore((state) => state.showAlert);
   const revertCommit = useAppStore((state) => state.revertCommit);
+  // Conflict resolver + file history own the whole column while they are open.
+  const openConflict = useAppStore((state) => state.openConflict);
+  const openFileHistory = useAppStore((state) => state.openFileHistory);
+  const conflictPath = useAppStore((state) => state.conflictPath);
+  const fileViewOpen = useAppStore((state) => state.fileView !== null);
+  const shownFileConflicted = useAppStore((state) => {
+    const target = state.worktreeTarget;
+    if (!target) return false;
+    return (
+      state.changes?.entries.some((entry) => entry.path === target.path && entry.conflicted) ?? false
+    );
+  });
   // Tagging this commit jumps to the tags pane with the create form pre-filled.
   const openTags = useAppStore((state) => state.openTags);
 
@@ -91,27 +108,6 @@ export default function DiffPanel() {
     const ok = await copyText(diff.patch);
     notify(ok ? "success" : "error", ok ? t("diff.copyPatchSuccess") : t("diff.copyFailure"));
   };
-
-  const modeToggle = (
-    <div className="ml-0.5 flex items-center gap-0.5 rounded-md border border-line bg-canvas/60 p-0.5">
-      <IconButton
-        label={t("diff.unifiedView")}
-        size="sm"
-        active={diffMode === "unified"}
-        onClick={() => setDiffMode("unified")}
-      >
-        <Rows3 size={12} />
-      </IconButton>
-      <IconButton
-        label={t("diff.splitView")}
-        size="sm"
-        active={diffMode === "split"}
-        onClick={() => setDiffMode("split")}
-      >
-        <Columns2 size={12} />
-      </IconButton>
-    </div>
-  );
 
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
@@ -196,17 +192,6 @@ export default function DiffPanel() {
     setSearchActive((current) => (current + delta + searchCount) % searchCount);
   };
 
-  const searchToggle = (
-    <IconButton
-      label={t("diff.findInDiff")}
-      shortcut="⌘F"
-      active={searchOpen}
-      onClick={() => (searchOpen ? closeSearch() : setSearchOpen(true))}
-    >
-      <Search size={13} />
-    </IconButton>
-  );
-
   const searchBar = searchOpen ? (
     <DiffSearch
       key={searchFocusKey}
@@ -220,41 +205,71 @@ export default function DiffPanel() {
     />
   ) : null;
 
+  if (conflictPath) return <ConflictPanel />;
+  if (fileViewOpen) return <FileHistoryPanel />;
+
   if (worktreeTarget) {
     return (
       <section className="flex h-full min-h-0 flex-col overflow-hidden bg-panel">
         <header
           data-tauri-drag-region
-          className="drag-region flex h-11 shrink-0 items-center gap-2 border-b border-line px-3"
+          className="drag-region flex h-14 shrink-0 items-center gap-2 border-b border-line px-3"
         >
-          <FileDiffIcon size={13} className="shrink-0 text-ink-faint" />
-          <span
-            className={`shrink-0 rounded px-1.5 py-0.5 text-[9.5px] font-semibold ${
-              worktreeTarget.staged
-                ? "bg-positive/12 text-positive"
-                : "bg-warning/14 text-warning"
-            }`}
-          >
-            {worktreeTarget.staged ? t("diff.staged") : t("diff.unstaged")}
-          </span>
-          <span className="min-w-0 flex-1 truncate font-mono text-[11px] text-ink-soft">
-            {worktreeTarget.path}
-          </span>
-          {diff ? (
-            <span className="shrink-0 font-mono text-[10px]">
-              <span className="text-positive">+{diff.additions}</span>
-              <span className="ml-1 text-negative">−{diff.deletions}</span>
-            </span>
-          ) : null}
+          {/* Two-line identity: the path gets its own line, the badges and stats
+              drop below it so they never squeeze the actions. */}
+          <div className="flex min-w-0 flex-1 flex-col justify-center gap-0.5 py-1">
+            <div className="flex min-w-0 items-center gap-1.5">
+              <FileDiffIcon size={12} className="shrink-0 text-ink-faint" />
+              <span
+                className="min-w-0 truncate font-mono text-[11.5px] text-ink"
+                {...tip(worktreeTarget.path)}
+              >
+                {worktreeTarget.path}
+              </span>
+              <span
+                className={`shrink-0 rounded px-1 py-px text-[9px] font-semibold ${
+                  worktreeTarget.staged
+                    ? "bg-positive/12 text-positive"
+                    : "bg-warning/14 text-warning"
+                }`}
+              >
+                {worktreeTarget.staged ? t("diff.staged") : t("diff.unstaged")}
+              </span>
+            </div>
 
-          <div className="no-drag ml-1 flex shrink-0 items-center gap-0.5">
-            <IconButton
-              label={t("diff.refreshThisFile")}
-              onClick={() => void refreshWorktreeDiff()}
-              disabled={diffLoading}
-            >
-              <RefreshCw size={13} className={diffLoading ? "animate-spin" : undefined} />
-            </IconButton>
+            <div className="flex min-w-0 items-center gap-1.5 text-[10px] text-ink-faint">
+              {diff ? (
+                <span className="shrink-0 font-mono">
+                  <span className="text-positive">+{diff.additions}</span>
+                  <span className="ml-1 text-negative">−{diff.deletions}</span>
+                </span>
+              ) : (
+                <span className="shrink-0">{t("diff.loadingDiff")}</span>
+              )}
+              <span className="shrink-0 text-ink-faint/50">·</span>
+              <button
+                type="button"
+                onClick={() => void openFileHistory(worktreeTarget.path, null)}
+                {...tip(t("fileHistory.openHint"), "⌘⇧H")}
+                className="no-drag inline-flex shrink-0 items-center gap-1 rounded px-1 py-px text-[10px] text-ink-faint transition-colors hover:bg-ink/6 hover:text-accent"
+              >
+                <History size={10} />
+                {t("fileHistory.tabHistory")}
+              </button>
+            </div>
+          </div>
+
+          <div className="no-drag ml-1 flex shrink-0 items-center gap-1">
+            {shownFileConflicted ? (
+              <button
+                type="button"
+                onClick={() => void openConflict(worktreeTarget.path)}
+                className="inline-flex items-center gap-1 rounded-md border border-warning/40 bg-warning/10 px-2 py-1 text-[10.5px] font-medium text-warning transition-colors hover:bg-warning/15"
+              >
+                <AlertTriangle size={11} />
+                {t("conflict.title")}
+              </button>
+            ) : null}
             {worktreeTarget.staged ? (
               <IconButton
                 label={t("diff.unstageThisFile")}
@@ -263,24 +278,52 @@ export default function DiffPanel() {
                 <Undo2 size={13} />
               </IconButton>
             ) : (
-              <IconButton label={t("diff.stageThisFile")} onClick={() => void stageFile(worktreeTarget.path)}>
+              <IconButton
+                label={t("diff.stageThisFile")}
+                onClick={() => void stageFile(worktreeTarget.path)}
+              >
                 <Plus size={13} />
               </IconButton>
             )}
-            <IconButton
-              label={t("diff.discardFileChanges")}
-              tone="danger"
-              onClick={() => setConfirmDiscard(true)}
-            >
-              <Trash2 size={13} />
-            </IconButton>
-            {diff?.patch ? (
-              <IconButton label={t("diff.copyThisFilePatch")} onClick={() => void copyPatch()}>
-                <ClipboardCopy size={13} />
-              </IconButton>
-            ) : null}
-            {searchToggle}
-            {modeToggle}
+            <RowMenu
+              label={t("common.more")}
+              items={[
+                {
+                  label: t("diff.refreshThisFile"),
+                  icon: <RefreshCw size={12} />,
+                  onSelect: () => void refreshWorktreeDiff(),
+                },
+                ...(diff?.patch
+                  ? [
+                      {
+                        label: t("diff.copyThisFilePatch"),
+                        icon: <ClipboardCopy size={12} />,
+                        onSelect: () => void copyPatch(),
+                      },
+                    ]
+                  : []),
+                {
+                  label: searchOpen ? t("diff.closeSearch") : t("diff.findInDiff"),
+                  icon: <Search size={12} />,
+                  onSelect: () => (searchOpen ? closeSearch() : setSearchOpen(true)),
+                },
+                {
+                  label:
+                    diffMode === "unified"
+                      ? t("diff.switchToSplit")
+                      : t("diff.switchToUnified"),
+                  icon: diffMode === "unified" ? <Columns2 size={12} /> : <Rows3 size={12} />,
+                  onSelect: () => setDiffMode(diffMode === "unified" ? "split" : "unified"),
+                },
+                {
+                  label: t("diff.discardFileChanges"),
+                  icon: <Trash2 size={12} />,
+                  tone: "danger" as const,
+                  separatorBefore: true,
+                  onSelect: () => setConfirmDiscard(true),
+                },
+              ]}
+            />
           </div>
         </header>
 
@@ -324,60 +367,125 @@ export default function DiffPanel() {
     <section className="flex h-full min-h-0 flex-col overflow-hidden bg-panel">
       <header
         data-tauri-drag-region
-        className="drag-region flex h-11 shrink-0 items-center gap-2 border-b border-line px-3"
+        className="drag-region flex h-14 shrink-0 items-center gap-2 border-b border-line px-3"
       >
-        {commit ? (
-          <>
-            <GitCommitHorizontal size={13} className="shrink-0 text-ink-faint" />
-            <ShaChip
-              sha={commit.sha}
-              className="px-1.5 py-0.5 text-[10.5px] text-ink-soft"
-            />
-            <span className="min-w-0 flex-1 truncate text-[11.5px] text-ink-soft" {...tip(commit.summary)}>
-              {commit.summary}
-            </span>
-            <span className="shrink-0 font-mono text-[10px] text-ink-faint">
-              {t("diff.fileCount", { count: formatCount(files.length) })}
-              <span className="ml-1.5 text-positive">+{stats.additions}</span>
-              <span className="ml-1 text-negative">−{stats.deletions}</span>
-            </span>
-          </>
-        ) : (
-          <>
-            <FileDiffIcon size={13} className="text-ink-faint" />
-            <span className="flex-1 text-[11.5px] font-medium text-ink-soft">{t("diff.comparison")}</span>
-          </>
-        )}
+        {/* Same two-line recipe as the worktree header: title on top, the
+            author / time / stats line below, only primary actions on the right. */}
+        <div className="flex min-w-0 flex-1 flex-col justify-center gap-0.5 py-1">
+          <div className="flex min-w-0 items-center gap-1.5">
+            {commit ? (
+              <>
+                <GitCommitHorizontal size={12} className="shrink-0 text-ink-faint" />
+                <ShaChip sha={commit.sha} className="shrink-0 px-1 py-px text-[10px] text-ink-soft" />
+                <span
+                  className="min-w-0 truncate text-[11.5px] text-ink"
+                  {...tip(commit.summary)}
+                >
+                  {commit.summary}
+                </span>
+                {detail?.isMerge ? (
+                  <span className="shrink-0 rounded border border-line px-1 py-px text-[9px] text-ink-faint">
+                    merge
+                  </span>
+                ) : null}
+              </>
+            ) : (
+              <>
+                <FileDiffIcon size={12} className="shrink-0 text-ink-faint" />
+                <span className="min-w-0 flex-1 truncate text-[11.5px] font-medium text-ink-soft">
+                  {t("diff.comparison")}
+                </span>
+              </>
+            )}
+          </div>
 
-        <div className="no-drag ml-1 flex shrink-0 items-center gap-0.5">
-          <IconButton
-            label={t("diff.refreshFileList")}
-            onClick={() => void refreshCommitFiles()}
-            disabled={filesLoading || !selectedCommitSha}
-          >
-            <RefreshCw size={13} className={filesLoading ? "animate-spin" : undefined} />
-          </IconButton>
-          {diff?.patch ? (
-            <IconButton label={t("diff.copyThisFilePatch")} onClick={() => void copyPatch()}>
-              <ClipboardCopy size={13} />
+          <div className="flex min-w-0 items-center gap-1.5 text-[10px] text-ink-faint">
+            {commit ? (
+              <>
+                <span className="min-w-0 truncate">{commit.authorName}</span>
+                <span className="shrink-0 text-ink-faint/50">·</span>
+                <span className="shrink-0" {...tip(timeTooltip(commit.committedAt))}>
+                  {relativeTime(commit.committedAt)}
+                </span>
+                <span className="shrink-0 text-ink-faint/50">·</span>
+                <span className="shrink-0 font-mono">
+                  {t("diff.fileCount", { count: formatCount(files.length) })}
+                  <span className="ml-1.5 text-positive">+{stats.additions}</span>
+                  <span className="ml-1 text-negative">−{stats.deletions}</span>
+                </span>
+              </>
+            ) : (
+              <span className="truncate">{t("diff.selectCommit")}</span>
+            )}
+          </div>
+        </div>
+
+        <div className="no-drag ml-1 flex shrink-0 items-center gap-1">
+          {selectedFilePath ? (
+            <IconButton
+              label={t("fileHistory.openHint")}
+              shortcut="⌘⇧H"
+              onClick={() => void openFileHistory(selectedFilePath, selectedCommitSha)}
+            >
+              <History size={13} />
             </IconButton>
           ) : null}
           {selectedCommitSha ? (
-            <>
-              <IconButton label={t("diff.copyCommitSha")} onClick={() => void copySha()}>
-                <Copy size={13} />
-              </IconButton>
-              <IconButton
-                label={t("diff.commitDetails")}
-                active={detailOpen}
-                onClick={() => setDetailOpen((open) => !open)}
-              >
-                <Info size={13} />
-              </IconButton>
-            </>
+            <RowMenu
+              label={t("common.more")}
+              items={[
+                {
+                  label: t("diff.refreshFileList"),
+                  icon: <RefreshCw size={12} />,
+                  onSelect: () => void refreshCommitFiles(),
+                },
+                ...(diff?.patch
+                  ? [
+                      {
+                        label: t("diff.copyThisFilePatch"),
+                        icon: <ClipboardCopy size={12} />,
+                        onSelect: () => void copyPatch(),
+                      },
+                    ]
+                  : []),
+                {
+                  label: t("diff.copyCommitSha"),
+                  icon: <Copy size={12} />,
+                  onSelect: () => void copySha(),
+                },
+                {
+                  label: t("diff.commitDetails"),
+                  icon: <Info size={12} />,
+                  onSelect: () => setDetailOpen((open) => !open),
+                },
+                {
+                  label: searchOpen ? t("diff.closeSearch") : t("diff.findInDiff"),
+                  icon: <Search size={12} />,
+                  onSelect: () => (searchOpen ? closeSearch() : setSearchOpen(true)),
+                },
+                {
+                  label:
+                    diffMode === "unified"
+                      ? t("diff.switchToSplit")
+                      : t("diff.switchToUnified"),
+                  icon: diffMode === "unified" ? <Columns2 size={12} /> : <Rows3 size={12} />,
+                  onSelect: () => setDiffMode(diffMode === "unified" ? "split" : "unified"),
+                },
+                {
+                  label: t("diff.addTag"),
+                  icon: <Tag size={12} />,
+                  separatorBefore: true,
+                  onSelect: () => openTags(selectedCommitSha),
+                },
+                {
+                  label: t("diff.revertThisCommit"),
+                  icon: <Undo2 size={12} />,
+                  tone: "danger" as const,
+                  onSelect: () => setConfirmRevert(true),
+                },
+              ]}
+            />
           ) : null}
-          {searchToggle}
-          {modeToggle}
         </div>
       </header>
 

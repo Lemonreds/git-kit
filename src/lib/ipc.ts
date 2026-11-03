@@ -5,6 +5,7 @@ import { t } from "../i18n";
 import type {
   AppError,
   AppSettings,
+  BlameWindow,
   BranchSummary,
   BranchTemplate,
   CheckoutResult,
@@ -14,12 +15,15 @@ import type {
   CommitPage,
   CommitResult,
   ComparePreview,
+  ConflictFile,
+  ConflictFileDetail,
   CreateBranchResult,
   HeadCommitPreview,
   DeleteBranchesResult,
   DeleteTagResult,
   FetchAllResult,
   FileDiff,
+  FileHistoryPage,
   Project,
   ProjectList,
   MergePreview,
@@ -132,8 +136,8 @@ export const api = {
   discardAll: (repoPath: string) => call<WorktreeStatus>("discard_all", { repoPath }),
   worktreeDiff: (repoPath: string, path: string, staged: boolean) =>
     call<FileDiff>("get_worktree_diff", { repoPath, path, staged, contextLines: 3 }),
-  commitStaged: (repoPath: string, message: string) =>
-    call<CommitResult>("commit_staged", { repoPath, message }),
+  commitStaged: (repoPath: string, message: string, noVerify = false) =>
+    call<CommitResult>("commit_staged", { repoPath, message, noVerify }),
 
   squashPreview: (repoPath: string, branch: string) =>
     call<SquashPreview>("squash_preview", { repoPath, branch }),
@@ -186,6 +190,33 @@ export const api = {
   getRepoState: (repoPath: string) => call<RepoOperationState>("get_repo_state", { repoPath }),
   repoOperation: (repoPath: string, action: "continue" | "skip" | "abort") =>
     call<RepoOperationState>("repo_operation_action", { repoPath, action }),
+
+  // --- conflict resolution ---
+  listConflicts: (repoPath: string) => call<ConflictFile[]>("list_conflicts", { repoPath }),
+  getConflictFile: (repoPath: string, path: string) =>
+    call<ConflictFileDetail>("get_conflict_file", { repoPath, path }),
+  resolveConflict: (repoPath: string, path: string, content: string) =>
+    call<RepoOperationState>("resolve_conflict", { repoPath, path, content }),
+  resolveConflictSide: (repoPath: string, path: string, side: "ours" | "theirs" | "delete") =>
+    call<RepoOperationState>("resolve_conflict_side", { repoPath, path, side }),
+
+  // --- blame / file history ---
+  fileBlame: (
+    repoPath: string,
+    path: string,
+    startLine: number,
+    endLine: number,
+    rev?: string | null,
+  ) =>
+    call<BlameWindow>("file_blame", {
+      repoPath,
+      path,
+      startLine,
+      endLine,
+      rev: rev ?? null,
+    }),
+  fileHistory: (repoPath: string, path: string, rev?: string | null, limit?: number) =>
+    call<FileHistoryPage>("file_history", { repoPath, path, rev: rev ?? null, limit: limit ?? null }),
 
   stashList: (repoPath: string) => call<StashList>("stash_list", { repoPath }),
   stashPush: (repoPath: string, message: string, includeUntracked = false) =>

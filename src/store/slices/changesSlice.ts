@@ -18,7 +18,7 @@ export interface ChangesSlice {
   stageAll: () => Promise<void>;
   unstageAll: () => Promise<void>;
   discardAll: () => Promise<void>;
-  commitStaged: (message: string) => Promise<boolean>;
+  commitStaged: (message: string, noVerify?: boolean) => Promise<boolean>;
 }
 
 /** Worktree status (staged / unstaged / untracked) and the staging operations. */
@@ -128,11 +128,11 @@ export const createChangesSlice: StateCreator<AppState, [], [], ChangesSlice> = 
       notify("info", t("store.allDiscarded"));
     },
 
-    async commitStaged(message) {
+    async commitStaged(message, noVerify = false) {
       const project = get().activeProject;
       if (!project) return false;
       try {
-        const result = await api.commitStaged(project.path, message);
+        const result = await api.commitStaged(project.path, message, noVerify);
         invalidateCaches();
         set({ worktreeTarget: null, diff: null, selectedFilePath: null, selectedCommitSha: null });
         await get().refreshChanges();

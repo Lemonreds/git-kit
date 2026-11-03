@@ -1,4 +1,4 @@
-import { EyeOff, Plus, Trash2, Undo2 } from "lucide-react";
+import { EyeOff, Plus, Trash2, Undo2, Wrench } from "lucide-react";
 
 import { useT } from "../../i18n";
 import { baseName, dirName, statusMeta } from "../../lib/format";
@@ -24,6 +24,8 @@ interface ChangeRowProps {
   onUnstage: () => void;
   onDiscard: () => void;
   onIgnore?: () => void;
+  /** Opens the block-level conflict resolver (conflicted rows only). */
+  onResolve?: () => void;
 }
 
 export default function ChangeRow({
@@ -35,6 +37,7 @@ export default function ChangeRow({
   onUnstage,
   onDiscard,
   onIgnore,
+  onResolve,
 }: ChangeRowProps) {
   const t = useT();
   const status: FileStatus | null = side === "staged" ? entry.staged : entry.unstaged;
@@ -84,6 +87,11 @@ export default function ChangeRow({
       </button>
 
       <div className="absolute right-1 top-1/2 hidden -translate-y-1/2 items-center gap-0.5 rounded-md bg-raised/95 px-0.5 py-0.5 shadow-float group-hover:flex group-focus-within:flex">
+        {onResolve && conflicted ? (
+          <IconButton label={t("conflict.title")} size="sm" onClick={onResolve}>
+            <Wrench size={13} />
+          </IconButton>
+        ) : null}
         {side === "unstaged" ? (
           <IconButton label={t("changes.stageFile")} size="sm" onClick={onStage}>
             <Plus size={13} />

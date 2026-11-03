@@ -4,8 +4,10 @@ import { en as branchesEn, zh as branchesZh } from "./branches";
 import { en as changesEn, zh as changesZh } from "./changes";
 import { en as commitsEn, zh as commitsZh } from "./commits";
 import { en as commonEn, zh as commonZh } from "./common";
+import { en as conflictEn, zh as conflictZh } from "./conflict";
 import { en as diffEn, zh as diffZh } from "./diff";
 import { en as errorsEn, zh as errorsZh } from "./errors";
+import { en as fileHistoryEn, zh as fileHistoryZh } from "./fileHistory";
 import { en as layoutEn, zh as layoutZh } from "./layout";
 import { en as libEn, zh as libZh } from "./lib";
 import { en as projectsEn, zh as projectsZh } from "./projects";
@@ -24,6 +26,8 @@ export const zhCN = {
   ...changesZh,
   ...commitsZh,
   ...diffZh,
+  ...conflictZh,
+  ...fileHistoryZh,
   ...settingsZh,
   ...storeZh,
   ...libZh,
@@ -44,6 +48,8 @@ export const enUS: Record<keyof typeof zhCN, Message> = {
   ...changesEn,
   ...commitsEn,
   ...diffEn,
+  ...conflictEn,
+  ...fileHistoryEn,
   ...settingsEn,
   ...storeEn,
   ...libEn,

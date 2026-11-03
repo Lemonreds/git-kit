@@ -457,3 +457,94 @@ export interface TerminalSessionInfo {
   cwd: string;
   shell: string;
 }
+
+// --- conflict resolution ---------------------------------------------------
+
+/** Shape of one conflicted index entry (which stages exist). */
+export type ConflictKind =
+  | "both_modified"
+  | "both_added"
+  | "deleted_by_us"
+  | "deleted_by_them"
+  | "both_deleted"
+  | "unknown";
+
+export interface ConflictFile {
+  path: string;
+  kind: ConflictKind;
+  hasBase: boolean;
+  hasOurs: boolean;
+  hasTheirs: boolean;
+}
+
+/** One version of a conflicted file (ancestor / ours / theirs). */
+export interface ConflictSide {
+  /** `null` when this stage does not exist or the blob is binary. */
+  text: string | null;
+  lines: number;
+  /** The blob was larger than the resolver's budget and was cut. */
+  truncated: boolean;
+  isBinary: boolean;
+}
+
+export interface ConflictFileDetail {
+  path: string;
+  kind: ConflictKind;
+  base: ConflictSide;
+  ours: ConflictSide;
+  theirs: ConflictSide;
+  /** On-disk copy, still carrying the conflict markers. */
+  worktreeText: string | null;
+  worktreeBinary: boolean;
+  eol: "lf" | "crlf";
+  oursLabel: string;
+  theirsLabel: string;
+  /** Every side fits in the budget, so block-level editing is safe. */
+  complete: boolean;
+  truncated: boolean;
+}
+
+// --- blame / file history --------------------------------------------------
+
+/** One run of lines attributed to the same commit. */
+export interface BlameHunk {
+  /** `null` for lines that are not committed yet. */
+  commitSha: string | null;
+  shortSha: string;
+  authorName: string;
+  authorEmail: string;
+  time: number;
+  summary: string;
+  /** 1-based first line in the blamed file. */
+  startLine: number;
+  lines: number;
+}
+
+export interface BlameWindow {
+  path: string;
+  rev: string;
+  totalLines: number;
+  startLine: number;
+  endLine: number;
+  hunks: BlameHunk[];
+  /** Content of `startLine..=endLine`, aligned with `startLine`. */
+  lines: string[];
+}
+
+export interface FileHistoryEntry {
+  sha: string;
+  shortSha: string;
+  authorName: string;
+  authorEmail: string;
+  committedAt: number;
+  summary: string;
+}
+
+export interface FileHistoryPage {
+  path: string;
+  rev: string;
+  entries: FileHistoryEntry[];
+  /** Older commits exist beyond the fetch cap. */
+  truncated: boolean;
+  followsRenames: boolean;
+}

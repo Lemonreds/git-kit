@@ -625,3 +625,136 @@ pub struct ComparePreview {
     pub additions: usize,
     pub deletions: usize,
 }
+
+// ---------------------------------------------------------------------------
+// Conflict resolution
+// ---------------------------------------------------------------------------
+
+/// Shape of one conflicted index entry, derived from which stages exist.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ConflictKind {
+    /// Stages 1/2/3 all exist: the usual "both sides edited this file".
+    BothModified,
+    /// No ancestor: both sides added the same path independently.
+    BothAdded,
+    /// The file is gone in our tree (deleted here, edited/kept there).
+    DeletedByUs,
+    /// The file is gone in their tree.
+    DeletedByThem,
+    /// Deleted on both sides.
+    BothDeleted,
+    Unknown,
+}
+
+/// One conflicted path, as listed by the status / banner without reading blobs.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ConflictFile {
+    pub path: String,
+    pub kind: ConflictKind,
+    /// Stage 1 (common ancestor) exists.
+    pub has_base: bool,
+    /// Stage 2 (ours) exists.
+    pub has_ours: bool,
+    /// Stage 3 (theirs) exists.
+    pub has_theirs: bool,
+}
+
+/// One version of a conflicted file (ancestor / ours / theirs).
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ConflictSide {
+    /// Text of that stage; `None` when the stage does not exist for this side.
+    pub text: Option<String>,
+    pub lines: usize,
+    /// The blob exceeded the size budget and was cut.
+    pub truncated: bool,
+    pub is_binary: bool,
+}
+
+/// Everything the conflict resolver needs for one path.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ConflictFileDetail {
+    pub path: String,
+    pub kind: ConflictKind,
+    pub base: ConflictSide,
+    pub ours: ConflictSide,
+    pub theirs: ConflictSide,
+    /// The file currently on disk — it still carries the conflict markers
+    /// until the resolution is saved.
+    pub worktree_text: Option<String>,
+    /// The on-disk copy is binary, so only whole-file choices are offered.
+    pub worktree_binary: bool,
+    /// `lf` / `crlf`: the line ending to restore when writing the resolution.
+    pub eol: String,
+    /// Human labels for the two sides (`main` / `origin/main`), best effort.
+    pub ours_label: String,
+    pub theirs_label: String,
+    /// Every side fits in the budget, so block-level editing is safe.
+    pub complete: bool,
+    pub truncated: bool,
+}
+
+// ---------------------------------------------------------------------------
+// Blame / file history
+// ---------------------------------------------------------------------------
+
+/// One run of lines attributed to the same commit.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BlameHunk {
+    /// `None` for lines that are not committed yet (working-tree changes).
+    pub commit_sha: Option<String>,
+    pub short_sha: String,
+    pub author_name: String,
+    pub author_email: String,
+    /// Author time in seconds since the epoch.
+    pub time: i64,
+    pub summary: String,
+    /// 1-based first line in the final (blamed) file.
+    pub start_line: usize,
+    pub lines: usize,
+}
+
+/// One window of blame output. The UI asks for windows as it scrolls, which
+/// keeps both the libgit2 work and the retained memory proportional to what is
+/// actually visible.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BlameWindow {
+    pub path: String,
+    pub rev: String,
+    pub total_lines: usize,
+    pub start_line: usize,
+    pub end_line: usize,
+    pub hunks: Vec<BlameHunk>,
+    /// File content of `start_line..=end_line`, so the view never has to hold the
+    /// whole file just to draw the loaded windows.
+    pub lines: Vec<String>,
+}
+
+/// One commit that touched a path (the file-history list row).
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FileHistoryEntry {
+    pub sha: String,
+    pub short_sha: String,
+    pub author_name: String,
+    pub author_email: String,
+    pub committed_at: i64,
+    pub summary: String,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FileHistoryPage {
+    pub path: String,
+    pub rev: String,
+    pub entries: Vec<FileHistoryEntry>,
+    /// The walk hit the `limit` cap, so older commits exist but are not listed.
+    pub truncated: bool,
+    /// A rename was followed, so `path` is the newest name only.
+    pub follows_renames: bool,
+}

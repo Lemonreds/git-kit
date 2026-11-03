@@ -19,7 +19,14 @@
 | **Commit UI** | `src/components/commits/CommitPanel.tsx` |
 | **Commit state** | `src/store/slices/commitsSlice.ts` |
 | **Changes UI** | `src/components/changes/ChangesPanel.tsx` |
-| **Diff UI** | `src/components/diff/DiffPanel.tsx` |
+| **Conflict resolver UI** | `src/components/conflict/ConflictPanel.tsx`, `ConflictBlockCard.tsx` |
+| **Conflict resolver state** | `src/store/slices/conflictSlice.ts` |
+| **Conflict markers** | `src/lib/parseConflicts.ts` (parse / assemble, pure) |
+| **Conflict backend** | `src-tauri/src/git/conflict.rs` (stages read, atomic write + stage) |
+| **File history / blame UI** | `src/components/history/FileHistoryPanel.tsx`, `VirtualBlameList.tsx` |
+| **File history state** | `src/store/slices/fileHistorySlice.ts` (windows + LRU caches) |
+| **Blame / history backend** | `src-tauri/src/git/history.rs` (git CLI windows) |
+| **Diff UI** | `src/components/diff/DiffPanel.tsx` (view priority: conflict → history → worktree → commit) |
 | **Terminal UI** | `src/components/terminal/Terminal.tsx` |
 | **Terminal state** | `src/store/slices/terminalSlice.ts` (LRU, max 3 sessions) |
 | **Terminal backend** | `src-tauri/src/terminal.rs` (PTY management) |
@@ -41,6 +48,7 @@
 ### Backend
 - **Read ops**: `git2` crate (libgit2) - fast, local-only
 - **Write ops**: `git` CLI - reuses user's SSH/credentials
+- **Exceptions (documented)**: blame of an arbitrary revision and rename-following file history use the `git` CLI; libgit2's `blame_file` only reads the working copy and its revwalk cannot follow renames
 - **Errors**: Always `Result<T, AppError>`, NO `unwrap()`/`expect()` (except tests)
 - **Dangerous ops**: Must have `xxx_preview()` + user confirmation + safe flags (`--force-with-lease`)
 
