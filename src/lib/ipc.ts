@@ -24,6 +24,8 @@ import type {
   FetchAllResult,
   FileDiff,
   FileHistoryPage,
+  HookInfo,
+  MergedBranchList,
   Project,
   ProjectList,
   MergePreview,
@@ -111,6 +113,17 @@ export const api = {
     call<BranchSummary[]>("list_branches", { repoPath, includeRemote }),
   listRemoteBranches: (repoPath: string, limit = 10, offset = 0) =>
     call<RemoteBranchPage>("list_remote_branches", { repoPath, limit, offset }),
+  listMergedBranches: (repoPath: string) =>
+    call<MergedBranchList>("list_merged_branches", { repoPath }),
+  listGitHooks: (repoPath: string) => call<HookInfo[]>("list_git_hooks", { repoPath }),
+  readGitHook: (repoPath: string, name: string) =>
+    call<string>("read_git_hook", { repoPath, name }),
+  writeGitHook: (repoPath: string, name: string, content: string, enabled = true) =>
+    call<HookInfo[]>("write_git_hook", { repoPath, name, content, enabled }),
+  setGitHookEnabled: (repoPath: string, name: string, enabled: boolean) =>
+    call<HookInfo[]>("set_git_hook_enabled", { repoPath, name, enabled }),
+  deleteGitHook: (repoPath: string, name: string) =>
+    call<HookInfo[]>("delete_git_hook", { repoPath, name }),
   listCommits: (repoPath: string, rev: string, offset = 0, limit = 50) =>
     call<CommitPage>("list_commits", { repoPath, rev, offset, limit }),
   getCommit: (repoPath: string, sha: string) => call<CommitDetail>("get_commit", { repoPath, sha }),

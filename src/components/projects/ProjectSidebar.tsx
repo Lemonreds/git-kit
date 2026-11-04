@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { ArrowUpDown, Check, FolderGit2, Loader2, Plus } from "lucide-react";
 
 import { useT } from "../../i18n";
+import { formatBinding } from "../../lib/keymap";
 import { groupProjects, projectSortLabel } from "../../lib/sortProjects";
 import type { ProjectSort } from "../../lib/sortProjects";
 import type { Project } from "../../lib/types";
@@ -34,6 +35,7 @@ export default function ProjectSidebar() {
 
   const setProjectSort = useAppStore((state) => state.setProjectSort);
   const addProject = useAppStore((state) => state.addProject);
+  const keymap = useAppStore((state) => state.keymap);
   const selectProject = useAppStore((state) => state.selectProject);
   const removeProject = useAppStore((state) => state.removeProject);
   const relinkProject = useAppStore((state) => state.relinkProject);
@@ -96,7 +98,7 @@ export default function ProjectSidebar() {
           </IconButton>
           <IconButton
             label={t("projects.addProject")}
-            shortcut="⌘O"
+            shortcut={formatBinding(keymap.addProject)}
             // The native folder sheet takes a moment to appear: the button has
             // to admit the click immediately, so it spins until the sheet is up.
             // Inert rather than `disabled` so the spinner keeps its full colour.

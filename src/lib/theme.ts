@@ -1,15 +1,34 @@
-export type Theme = "light" | "dark";
+export type Theme = "light" | "dark" | "system";
 
 const STORAGE_KEY = "gk.theme";
 
 /**
- * Light is the default on purpose: the app used to follow the system and that
- * meant a dark window nobody asked for. Following the OS is available implicitly
- * by picking a theme once — the choice is explicit and survives restarts.
+ * Get the system's current color scheme preference.
+ */
+export function getSystemTheme(): "light" | "dark" {
+  if (typeof window === "undefined") return "light";
+  return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+}
+
+/**
+ * Resolve the actual theme to apply based on user preference.
+ * If theme is "system", returns the current system preference.
+ */
+export function resolveTheme(theme: Theme): "light" | "dark" {
+  return theme === "system" ? getSystemTheme() : theme;
+}
+
+/**
+ * Light is the default on purpose: the app used to follow the OS silently, which
+ * meant a dark window nobody asked for. Following the system is still available,
+ * but only as an explicit `system` choice that survives restarts.
  */
 export function readTheme(): Theme {
   try {
-    return localStorage.getItem(STORAGE_KEY) === "dark" ? "dark" : "light";
+    const stored = localStorage.getItem(STORAGE_KEY);
+    if (stored === "dark") return "dark";
+    if (stored === "system") return "system";
+    return "light";
   } catch {
     return "light";
   }
@@ -24,10 +43,11 @@ export function readTheme(): Theme {
  * Settings take effect immediately.
  */
 export function applyTheme(theme: Theme): void {
+  const resolved = resolveTheme(theme);
   const root = document.documentElement;
-  root.dataset.theme = theme;
+  root.dataset.theme = resolved;
   // Keeps native scrollbars, form controls and text selection in the same mode.
-  root.style.colorScheme = theme;
+  root.style.colorScheme = resolved;
 }
 
 export function setStoredTheme(theme: Theme): void {

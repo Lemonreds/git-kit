@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Cloud, Palette, Sparkles, UserRound } from "lucide-react";
+import { Cloud, Keyboard, Palette, Sparkles, Terminal, UserRound } from "lucide-react";
 
 import type { MessageKey } from "../../i18n";
 import { useT } from "../../i18n";
@@ -8,14 +8,16 @@ import { shortPath } from "../../lib/format";
 import Modal from "../common/Modal";
 import AppearancePanel from "./AppearancePanel";
 import BranchTemplatePanel from "./BranchTemplatePanel";
+import HooksPanel from "./HooksPanel";
 import IdentityPanel from "./IdentityPanel";
 import RemotesPanel from "./RemotesPanel";
+import ShortcutsPanel from "./ShortcutsPanel";
 
 interface SettingsDialogProps {
   onClose: () => void;
 }
 
-type Tab = "general" | "remotes" | "identity" | "templates";
+type Tab = "general" | "shortcuts" | "remotes" | "identity" | "templates" | "hooks";
 
 interface TabSpec {
   id: Tab;
@@ -32,6 +34,13 @@ const TABS: TabSpec[] = [
     label: "settings.tab.general",
     hint: "settings.tab.generalHint",
     icon: Palette,
+    scope: "app",
+  },
+  {
+    id: "shortcuts",
+    label: "settings.tab.shortcuts",
+    hint: "settings.tab.shortcutsHint",
+    icon: Keyboard,
     scope: "app",
   },
   {
@@ -55,13 +64,22 @@ const TABS: TabSpec[] = [
     icon: Sparkles,
     scope: "repo",
   },
+  {
+    id: "hooks",
+    label: "settings.tab.hooks",
+    hint: "settings.tab.hooksHint",
+    icon: Terminal,
+    scope: "repo",
+  },
 ];
 
 const SUBTITLES: Record<Tab, MessageKey> = {
   general: "settings.subtitle.general",
+  shortcuts: "settings.subtitle.shortcuts",
   remotes: "settings.subtitle.remotes",
   identity: "settings.subtitle.identity",
   templates: "settings.subtitle.templates",
+  hooks: "settings.subtitle.hooks",
 };
 
 export default function SettingsDialog({ onClose }: SettingsDialogProps) {
@@ -145,7 +163,8 @@ export default function SettingsDialog({ onClose }: SettingsDialogProps) {
 
         <div className="min-w-0 flex-1 overflow-y-auto pr-1">
           {tab === "general" ? <AppearancePanel /> : null}
-          {tab !== "general" && !repoReady ? (
+          {tab === "shortcuts" ? <ShortcutsPanel /> : null}
+          {tab !== "general" && tab !== "shortcuts" && !repoReady ? (
             <p className="rounded-lg border border-warning/30 bg-warning/8 px-3 py-2 text-[11px] leading-relaxed text-ink-soft">
               {t("settings.repoUnavailable")}
             </p>
@@ -153,6 +172,7 @@ export default function SettingsDialog({ onClose }: SettingsDialogProps) {
           {repoReady && tab === "remotes" ? <RemotesPanel /> : null}
           {repoReady && tab === "identity" ? <IdentityPanel /> : null}
           {repoReady && tab === "templates" ? <BranchTemplatePanel /> : null}
+          {repoReady && tab === "hooks" ? <HooksPanel /> : null}
         </div>
       </div>
     </Modal>

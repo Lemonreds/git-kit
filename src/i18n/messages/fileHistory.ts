@@ -39,7 +39,7 @@ export const zh = {
   "fileHistory.jumpToCommit": "在历史中查看这个提交",
   "fileHistory.lineCount": "共 {count} 行",
   "fileHistory.blameSideHeader": "提交 / 作者",
-  "fileHistory.openHint": "查看文件历史与逐行 Blame",
+  "fileHistory.openHint": "文件历史 / Blame",
   "fileHistory.backToDiff": "返回差异",
 } satisfies Record<string, Message>;
 
@@ -82,6 +82,6 @@ export const en: Record<keyof typeof zh, Message> = {
   "fileHistory.jumpToCommit": "Show this commit in the history",
   "fileHistory.lineCount": { one: "{count} line", other: "{count} lines" },
   "fileHistory.blameSideHeader": "Commit / author",
-  "fileHistory.openHint": "Show the file history and per-line blame",
+  "fileHistory.openHint": "File history / blame",
   "fileHistory.backToDiff": "Back to the diff",
 };

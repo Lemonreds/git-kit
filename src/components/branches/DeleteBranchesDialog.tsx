@@ -4,6 +4,7 @@ import { AlertTriangle, Check, Loader2, ShieldOff, Trash2 } from "lucide-react";
 import { useT } from "../../i18n";
 import { isProtectedBranch } from "../../lib/branchTemplate";
 import { relativeTime } from "../../lib/format";
+import { api } from "../../lib/ipc";
 import type { BranchSummary, DeleteFailure } from "../../lib/types";
 import { useAppStore } from "../../store/appStore";
 import ConfirmDialog from "../common/ConfirmDialog";
@@ -37,6 +38,10 @@ export default function DeleteBranchesDialog({ branches, onClose }: DeleteBranch
   const [forceUnmerged, setForceUnmerged] = useState(false);
   const [deleteRemote, setDeleteRemote] = useState(false);
   const [busy, setBusy] = useState(false);
+  // Branches already contained in HEAD: a read-only `git` query, so the list can
+  // offer "select the merged ones" without guessing from ahead/behind counts.
+  const [merged, setMerged] = useState<Set<string>>(new Set());
+  const [mergedBase, setMergedBase] = useState<string | null>(null);
   const [confirming, setConfirming] = useState(false);
   const [report, setReport] = useState<{
     deleted: string[];
@@ -45,12 +50,32 @@ export default function DeleteBranchesDialog({ branches, onClose }: DeleteBranch
     remoteFailed: DeleteFailure[];
   } | null>(null);
 
+  useEffect(() => {
+    if (!project) return;
+    let alive = true;
+    api
+      .listMergedBranches(project.path)
+      .then((list) => {
+        if (!alive) return;
+        setMerged(new Set(list.branches.map((branch) => branch.name)));
+        setMergedBase(list.base);
+      })
+      .catch(() => {
+        // Not fatal: the dialog still works without the merged hint.
+      });
+    return () => {
+      alive = false;
+    };
+  }, [project]);
+
   // A branch that vanished (external `git branch -d`) must not stay selected.
   useEffect(() => {
     setSelected((current) => current.filter((name) => candidates.some((branch) => branch.name === name)));
   }, [candidates]);
 
   const selectable = candidates.filter((branch) => !branch.isHead);
+  // Count only branches that can actually be deleted in one click.
+  const mergedCount = selectable.filter((branch) => merged.has(branch.name)).length;
   const allSelected = selectable.length > 0 && selectable.every((branch) => selected.includes(branch.name));
 
   const toggle = (name: string) => {
@@ -154,6 +179,22 @@ export default function DeleteBranchesDialog({ branches, onClose }: DeleteBranch
               <span className="text-[10.5px] text-ink-faint">
                 {t("branches.selectedOf", { selected: selected.length, total: selectable.length })}
               </span>
+              {mergedCount > 0 ? (
+                <button
+                  type="button"
+                  onClick={() =>
+                    setSelected(
+                      selectable
+                        .filter((branch) => merged.has(branch.name) && !isProtectedBranch(branch.name))
+                        .map((branch) => branch.name),
+                    )
+                  }
+                  title={t("branches.selectMergedHint", { base: mergedBase ?? "HEAD" })}
+                  className="rounded-md border border-accent/40 px-1.5 py-0.5 text-[10.5px] text-accent transition-colors hover:bg-accent/10"
+                >
+                  {t("branches.selectMerged", { count: mergedCount })}
+                </button>
+              ) : null}
               <button
                 type="button"
                 onClick={() =>
@@ -214,6 +255,11 @@ export default function DeleteBranchesDialog({ branches, onClose }: DeleteBranch
                         {isProtectedBranch(branch.name) ? (
                           <span className="shrink-0 rounded border border-line px-1 py-px text-[9px] text-ink-faint">
                             {t("branches.protectedBranch")}
+                          </span>
+                        ) : null}
+                        {merged.has(branch.name) ? (
+                          <span className="shrink-0 rounded bg-positive/12 px-1 py-px text-[9px] font-medium text-positive">
+                            {t("branches.mergedBadge")}
                           </span>
                         ) : null}
                         {branch.ahead ? (

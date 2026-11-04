@@ -1,5 +1,6 @@
 import { create } from "zustand";
 
+import { createAutomationSlice, type AutomationSlice } from "./slices/automationSlice";
 import { createBranchOpsSlice, type BranchOpsSlice } from "./slices/branchOpsSlice";
 import { createBranchSlice, type BranchSlice } from "./slices/branchSlice";
 import { createChangesSlice, type ChangesSlice } from "./slices/changesSlice";
@@ -28,6 +29,7 @@ export type * from "./types";
  * - `conflictSlice`  the conflict resolver (one conflicted path at a time)
  * - `fileHistorySlice` file history + per-line blame of the open file
  * - `workflowSlice`  repo operation state, stash, tags, reflog, reset
+ * - `automationSlice` stored workflow sequences + their runner
  * - `settingsSlice`  branch templates, settings dialog, commit identity
  * - `prefsSlice`     app-wide appearance (theme)
  * - `terminalSlice`  built-in terminal tabs, panel height, LRU ceiling
@@ -46,6 +48,7 @@ export type AppState = ProjectSlice &
   ConflictSlice &
   FileHistorySlice &
   WorkflowSlice &
+  AutomationSlice &
   SettingsSlice &
   PrefsSlice &
   TerminalSlice &
@@ -61,6 +64,7 @@ export const useAppStore = create<AppState>()((...args) => ({
   ...createConflictSlice(...args),
   ...createFileHistorySlice(...args),
   ...createWorkflowSlice(...args),
+  ...createAutomationSlice(...args),
   ...createSettingsSlice(...args),
   ...createPrefsSlice(...args),
   ...createTerminalSlice(...args),

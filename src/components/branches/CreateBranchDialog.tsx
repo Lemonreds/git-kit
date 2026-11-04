@@ -58,6 +58,13 @@ export default function CreateBranchDialog({ initialBaseRef, onClose }: CreateBr
   const [baseRef, setBaseRef] = useState("");
   const [busy, setBusy] = useState<"create" | "checkout" | null>(null);
   const initialized = useRef(false);
+  /**
+   * Name of the branch this dialog just submitted. Creating it refreshes the
+   * branch list before the dialog closes, so the new branch is already in
+   * `branches` while we are still waiting — without this it would briefly show
+   * up as "local branch already exists" right after a successful create.
+   */
+  const submittedName = useRef<string | null>(null);
 
   // Templates load asynchronously — seed the form on the first render that has them.
   useEffect(() => {
@@ -83,7 +90,9 @@ export default function CreateBranchDialog({ initialBaseRef, onClose }: CreateBr
   const baseBranch = allBranches.find((branch) => branch.refName === baseRef) ?? null;
   const trimmed = name.trim();
   const check = checkBranchName(trimmed);
-  const duplicate = branches.some((branch) => !branch.isRemote && branch.name === trimmed);
+  const duplicate =
+    trimmed !== submittedName.current &&
+    branches.some((branch) => !branch.isRemote && branch.name === trimmed);
   const valid = check.valid && !duplicate && baseRef.length > 0;
 
   const applyTemplate = (id: string | null) => {
@@ -103,10 +112,17 @@ export default function CreateBranchDialog({ initialBaseRef, onClose }: CreateBr
 
   const submit = async (checkout: boolean) => {
     if (!valid || busy) return;
+    submittedName.current = trimmed;
     setBusy(checkout ? "checkout" : "create");
     const ok = await createBranch(trimmed, baseRef, checkout);
     setBusy(null);
-    if (ok) onClose();
+    if (ok) {
+      onClose();
+      return;
+    }
+    // Failed for real (backend rejected the name, checkout refused…): let the
+    // inline validation speak again and keep what the user typed.
+    submittedName.current = null;
   };
 
   const showDates = template ? hasDateToken(template.rule) : false;
@@ -241,9 +257,15 @@ export default function CreateBranchDialog({ initialBaseRef, onClose }: CreateBr
             onChange={(event) => setName(event.target.value)}
             placeholder="feature_20261029"
             spellCheck={false}
-            className="w-full rounded-lg border border-line bg-panel px-2.5 py-1.5 font-mono text-[12px] text-ink outline-none transition-colors focus:border-accent/60"
+            disabled={busy !== null}
+            className="w-full rounded-lg border border-line bg-panel px-2.5 py-1.5 font-mono text-[12px] text-ink outline-none transition-colors focus:border-accent/60 disabled:opacity-70"
           />
-          {trimmed ? (
+          {busy !== null ? (
+            <span className="mt-1 flex items-center gap-1 text-[10.5px] leading-relaxed text-ink-faint">
+              <Loader2 size={10.5} className="animate-spin" />
+              {t("branches.creating", { name: trimmed })}
+            </span>
+          ) : trimmed ? (
             <span className="mt-1 flex items-start gap-1 text-[10.5px] leading-relaxed">
               {duplicate ? (
                 <span className="text-negative">

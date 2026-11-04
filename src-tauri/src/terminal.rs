@@ -74,6 +74,156 @@ struct Gate {
     tail: Vec<u8>,
 }
 
+/// Answers the terminal colour queries the CLI tools use to pick a palette.
+///
+/// GitKit's terminal is light, always (see `src/lib/terminal.ts`), and the child
+/// process has to be told: Claude Code asks for the background with `OSC 11` and
+/// resolves its theme as `cached ?? detected ?? "dark"`, so a missing answer means
+/// a dark palette — every code block (and Claude Code's whole fullscreen surface)
+/// painted as a black patch inside a white window. Codex's TUI reads the same
+/// answer.
+///
+/// The reply is produced here, on the pty stream, rather than by xterm.js, because
+/// xterm's answer has to travel pty → Rust → webview → xterm's write queue →
+/// `onData` → IPC → Rust first, and while the panel is paused the query never
+/// reaches xterm at all (it waits in [`Gate::tail`]). Two answers are worse than
+/// none — the second one lands in the CLI's input buffer — so `terminal.ts`
+/// silences xterm's built-in reply and this stays the only source.
+#[derive(Debug, Default)]
+struct ColorQueryResponder {
+    /// Tail of the previous chunk: a query can be split across two `read`s.
+    carry: Vec<u8>,
+}
+
+const ESC: u8 = 0x1b;
+const BEL: u8 = 0x07;
+/// `rgb:ffff/ffff/ffff` is the white `background` of the theme in `src/lib/terminal.ts`.
+const BACKGROUND_REPLY: &[u8] = b"\x1b]11;rgb:ffff/ffff/ffff\x1b\\";
+/// The terminal's foreground, `#1c1c1e`, four hex digits per channel.
+const FOREGROUND_REPLY: &[u8] = b"\x1b]10;rgb:1c1c/1c1c/1c1e\x1b\\";
+/// A real query is `ESC ] 11 ; ?`; anything longer is a sequence we never answer,
+/// so an unterminated tail that big can just be dropped.
+const MAX_PENDING: usize = 64;
+
+/// What one OSC introducer turned out to be.
+enum Step {
+    /// Not a query we answer: look again from this offset.
+    Skip(usize),
+    /// A colour query; send `reply` and continue at the offset.
+    Answer(&'static [u8], usize),
+    /// The sequence continues in the next chunk.
+    Pending,
+}
+
+impl ColorQueryResponder {
+    /// Scan one pty chunk and return the bytes to write back (usually empty).
+    fn feed(&mut self, chunk: &[u8]) -> Vec<u8> {
+        let mut replies = Vec::new();
+        // Fast path: most output carries no escapes at all.
+        if self.carry.is_empty() && !chunk.contains(&ESC) {
+            return replies;
+        }
+
+        let mut buffer = std::mem::take(&mut self.carry);
+        buffer.extend_from_slice(chunk);
+
+        let mut index = 0usize;
+        loop {
+            match buffer[index..].iter().position(|byte| *byte == ESC) {
+                Some(offset) => index += offset,
+                None => {
+                    index = buffer.len();
+                    break;
+                }
+            }
+            match Self::inspect(&buffer, index) {
+                Step::Skip(next) => index = next,
+                Step::Answer(reply, next) => {
+                    replies.extend_from_slice(reply);
+                    index = next;
+                }
+                Step::Pending => break,
+            }
+        }
+
+        let rest = buffer.len().saturating_sub(index);
+        if rest > 0 && rest <= MAX_PENDING {
+            buffer.drain(..index);
+            self.carry = buffer;
+        }
+        replies
+    }
+
+    /// Classify the escape sequence that starts at `start` (which holds `ESC`).
+    fn inspect(buffer: &[u8], start: usize) -> Step {
+        let Some(&next) = buffer.get(start + 1) else {
+            return Step::Pending;
+        };
+        if next != b']' {
+            return Step::Skip(start + 1);
+        }
+
+        let digits_from = start + 2;
+        let mut cursor = digits_from;
+        let mut ident = 0u32;
+        while let Some(&byte) = buffer.get(cursor) {
+            if !byte.is_ascii_digit() {
+                break;
+            }
+            // Clamped: we only care about 10 and 11, and an absurd digit run must
+            // not overflow the accumulator.
+            ident = (ident * 10 + u32::from(byte - b'0')).min(1_000);
+            cursor += 1;
+        }
+        if cursor == digits_from {
+            // `ESC ] ;` or `ESC ]` + payload: never a colour query.
+            return if cursor < buffer.len() {
+                Step::Skip(cursor)
+            } else {
+                Step::Pending
+            };
+        }
+        match buffer.get(cursor) {
+            None => return Step::Pending,
+            Some(b';') => {}
+            Some(_) => return Step::Skip(cursor),
+        }
+
+        // Payload runs to `BEL` or `ESC \` (the string terminator).
+        let payload_from = cursor + 1;
+        let mut scan = payload_from;
+        let end = loop {
+            let Some(&byte) = buffer.get(scan) else {
+                return Step::Pending;
+            };
+            if byte == BEL {
+                break (scan, scan + 1);
+            }
+            if byte == ESC {
+                match buffer.get(scan + 1) {
+                    None => return Step::Pending,
+                    Some(b'\\') => break (scan, scan + 2),
+                    // A stray escape inside the payload: not a sequence we know.
+                    Some(_) => return Step::Skip(scan),
+                }
+            }
+            scan += 1;
+        };
+
+        let (payload_end, next) = end;
+        // Only `?` asks a question; `OSC 11 ; rgb:…` *sets* a colour and must keep
+        // working, so it stays out of the way.
+        if &buffer[payload_from..payload_end] != b"?" {
+            return Step::Skip(next);
+        }
+        match ident {
+            11 => Step::Answer(BACKGROUND_REPLY, next),
+            10 => Step::Answer(FOREGROUND_REPLY, next),
+            _ => Step::Skip(next),
+        }
+    }
+}
+
 impl Gate {
     /// Append while paused, keeping at most [`PAUSED_LIMIT`] bytes: the oldest
     /// output is dropped because a user who re-opens the panel cares about the
@@ -87,13 +237,26 @@ impl Gate {
     }
 }
 
+/// Shared with the pump so it can answer colour queries the moment they arrive.
+/// Every write (`terminal_write`, the pump's replies) goes through this lock, which
+/// is only ever held for one `write_all`.
+type PseudoWriter = Arc<Mutex<Box<dyn Write + Send>>>;
+
 struct Session {
     shell: String,
     master: Box<dyn MasterPty + Send>,
-    writer: Box<dyn Write + Send>,
+    writer: PseudoWriter,
     killer: Box<dyn ChildKiller + Send + Sync>,
     gate: Arc<Mutex<Gate>>,
     channel: Channel<InvokeResponseBody>,
+}
+
+/// EPIPE and friends mean the shell is gone: a reply that cannot be delivered is
+/// never fatal, and the pump has nothing better to do than keep reading.
+fn write_pty(writer: &PseudoWriter, data: &[u8]) {
+    if let Ok(mut guard) = writer.lock() {
+        let _ = guard.write_all(data);
+    }
 }
 
 #[derive(Default)]
@@ -238,10 +401,12 @@ fn notify_exit(channel: &Channel<InvokeResponseBody>, code: Option<u32>) {
 /// an independent [`ChildKiller`] for `terminal_close`. On EOF the session is
 /// dropped from the manager as well, otherwise a shell the user closed with
 /// `exit` would keep occupying one of the [`MAX_SESSIONS`] slots.
+#[allow(clippy::too_many_arguments)]
 fn pump(
     app: AppHandle,
     session_id: String,
     mut reader: Box<dyn Read + Send>,
+    writer: PseudoWriter,
     mut child: Box<dyn Child + Send + Sync>,
     channel: Channel<InvokeResponseBody>,
     gate: Arc<Mutex<Gate>>,
@@ -251,6 +416,7 @@ fn pump(
         .spawn(move || {
             let mut chunk = [0u8; READ_BUFFER];
             let mut batch: Vec<u8> = Vec::with_capacity(FLUSH_THRESHOLD);
+            let mut responder = ColorQueryResponder::default();
 
             loop {
                 let read = match reader.read(&mut chunk) {
@@ -259,6 +425,15 @@ fn pump(
                     Err(error) if error.kind() == ErrorKind::Interrupted => continue,
                     Err(_) => break,
                 };
+
+                // Colour queries are answered before the pause check: a paused
+                // panel never forwards these bytes to the webview, and a CLI that
+                // is still waiting for "what colour is your background" would
+                // settle on a dark palette.
+                let replies = responder.feed(&chunk[..read]);
+                if !replies.is_empty() {
+                    write_pty(&writer, &replies);
+                }
 
                 // The panel is collapsed or the window is hidden: keep only the
                 // tail and never wake the webview up.
@@ -372,6 +547,9 @@ fn spawn(
     command.env("TERM", "xterm-256color");
     command.env("COLORTERM", "truecolor");
     command.env("TERM_PROGRAM", "GitKit");
+    // The terminal is light. Programs that never ask (OSC 11) but read `COLORFGBG`
+    // get the same answer here: `fg;bg` = black on white.
+    command.env("COLORFGBG", "0;15");
     // LANG / LC_ALL are inherited on purpose: forcing en_US.UTF-8 (as the git
     // CLI wrapper does) would mangle Chinese file names in the prompt.
     command.env_remove("ELECTRON_RUN_AS_NODE");
@@ -390,9 +568,18 @@ fn spawn(
     let writer = master
         .take_writer()
         .map_err(|error| AppError::Terminal(format!("无法写入终端：{error}")))?;
+    let writer: PseudoWriter = Arc::new(Mutex::new(writer));
 
     let gate = Arc::new(Mutex::new(Gate::default()));
-    pump(app, session_id, reader, child, channel.clone(), Arc::clone(&gate));
+    pump(
+        app,
+        session_id,
+        reader,
+        Arc::clone(&writer),
+        child,
+        channel.clone(),
+        Arc::clone(&gate),
+    );
 
     Ok(Session {
         shell: program,
@@ -418,6 +605,8 @@ pub fn terminal_write(
         .ok_or_else(|| AppError::Terminal("终端会话已结束".to_string()))?;
     session
         .writer
+        .lock()
+        .map_err(|_| AppError::Terminal("终端状态异常".to_string()))?
         .write_all(data.as_bytes())
         .map_err(|error| AppError::Terminal(format!("写入终端失败：{error}")))
 }
@@ -596,6 +785,61 @@ mod tests {
         assert_eq!((tiny.cols, tiny.rows), (20, 4));
         let huge = clamp_size(u16::MAX, u16::MAX);
         assert_eq!((huge.cols, huge.rows), (400, 200));
+    }
+
+    #[test]
+    fn answers_the_background_and_foreground_queries() {
+        let mut responder = ColorQueryResponder::default();
+        // Claude Code and Codex both use BEL-terminated queries…
+        assert_eq!(responder.feed(b"\x1b]11;?\x07"), BACKGROUND_REPLY);
+        assert_eq!(responder.feed(b"\x1b]10;?\x07"), FOREGROUND_REPLY);
+        // …and some tools use the string terminator instead.
+        assert_eq!(responder.feed(b"\x1b]11;?\x1b\\"), BACKGROUND_REPLY);
+    }
+
+    #[test]
+    fn answers_a_query_that_straddles_two_reads() {
+        let mut responder = ColorQueryResponder::default();
+        assert!(responder.feed(b"prompt$ \x1b]1").is_empty());
+        assert!(responder.feed(b"1;").is_empty());
+        assert_eq!(responder.feed(b"?\x07"), BACKGROUND_REPLY);
+    }
+
+    #[test]
+    fn only_the_question_form_is_answered() {
+        let mut responder = ColorQueryResponder::default();
+        // `OSC 11 ; rgb:…` *sets* the background; leaving it alone keeps apps that
+        // paint through the terminal working.
+        assert!(responder.feed(b"\x1b]11;rgb:0000/0000/0000\x07").is_empty());
+        // OSC 4 is the palette query, not the default background.
+        assert!(responder.feed(b"\x1b]4;0;?\x07").is_empty());
+        // Hyperlinks and window titles must survive untouched.
+        assert!(responder
+            .feed(b"\x1b]8;;https://example.com\x07link\x1b]8;;\x07\x1b]0;title\x07")
+            .is_empty());
+    }
+
+    #[test]
+    fn answers_every_query_in_one_burst() {
+        let mut responder = ColorQueryResponder::default();
+        let replies = responder.feed(b"\x1b]11;?\x07a\x1b]10;?\x07\x1b]11;?\x07");
+        assert_eq!(
+            replies,
+            [BACKGROUND_REPLY, FOREGROUND_REPLY, BACKGROUND_REPLY].concat()
+        );
+    }
+
+    #[test]
+    fn plain_output_keeps_no_pending_bytes() {
+        let mut responder = ColorQueryResponder::default();
+        assert!(responder.feed(b"git status\nnothing to commit\n").is_empty());
+        assert!(responder.carry.is_empty());
+        // An unterminated sequence that could never be a query is not buffered
+        // forever either.
+        let mut noise = vec![ESC, b']', b'8', b';', b';'];
+        noise.extend_from_slice(&[b'x'; MAX_PENDING + 8]);
+        assert!(responder.feed(&noise).is_empty());
+        assert!(responder.carry.is_empty());
     }
 
     #[test]

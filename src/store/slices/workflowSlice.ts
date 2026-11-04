@@ -43,6 +43,10 @@ export interface WorkflowSlice {
   revertCommit: (sha: string) => Promise<OpOutcome>;
   /** Open the tags pane of the middle column; `newTagTarget` pre-fills the form. */
   openTags: (newTagTarget?: string | null) => void;
+  /** Open the stash pane of the middle column. */
+  openStash: () => void;
+  /** Open the workflow automation pane of the middle column. */
+  openWorkflows: () => void;
   clearTagTarget: () => void;
   setTagFilter: (filter: string) => void;
   /** Reveal the next TAG_PAGE tags at the bottom of the list. */
@@ -164,7 +168,15 @@ export const createWorkflowSlice: StateCreator<AppState, [], [], WorkflowSlice> 
       if (!project) return { ok: false };
       try {
         const list = await api.stashPop(project.path, index);
-        set({ stashEntries: list.entries });
+        // The stash commits the detail column may be previewing are gone or
+        // renumbered: close any stash preview so it cannot show a dead ref. The
+        // pane itself stays where the user is (popping must not jump to
+        // branches).
+        const previewing = get().stashPreview;
+        set({
+          stashEntries: list.entries,
+          ...(previewing ? { ...clearDetail(), pane: get().pane } : {}),
+        });
         invalidateCaches();
         await get().refreshChanges();
         notify("success", t("store.stashRestored"));
@@ -184,7 +196,15 @@ export const createWorkflowSlice: StateCreator<AppState, [], [], WorkflowSlice> 
       if (!project) return false;
       try {
         const list = await api.stashDrop(project.path, index);
-        set({ stashEntries: list.entries });
+        // The stash commits the detail column may be previewing are gone or
+        // renumbered: close any stash preview so it cannot show a dead ref. The
+        // pane itself stays where the user is (popping must not jump to
+        // branches).
+        const previewing = get().stashPreview;
+        set({
+          stashEntries: list.entries,
+          ...(previewing ? { ...clearDetail(), pane: get().pane } : {}),
+        });
         notify("success", t("store.stashDropped"));
         return true;
       } catch (error) {
@@ -285,6 +305,14 @@ export const createWorkflowSlice: StateCreator<AppState, [], [], WorkflowSlice> 
         tagLimit: TAG_PAGE,
         tagTarget: newTagTarget ?? null,
       });
+    },
+
+    openStash() {
+      set({ ...clearDetail(), pane: "stash" });
+    },
+
+    openWorkflows() {
+      set({ ...clearDetail(), pane: "workflows" });
     },
 
     clearTagTarget() {

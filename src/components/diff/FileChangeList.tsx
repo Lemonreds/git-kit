@@ -1,6 +1,7 @@
 import { useT } from "../../i18n";
-import { baseName, dirName, statusMeta } from "../../lib/format";
+import { baseName, copyText, dirName, statusMeta } from "../../lib/format";
 import type { FileChange } from "../../lib/types";
+import { useAppStore } from "../../store/appStore";
 import { tip } from "../common/Tooltip";
 
 const TONE_CLASS: Record<string, string> = {
@@ -19,6 +20,14 @@ interface FileChangeListProps {
 
 export default function FileChangeList({ files, selectedPath, onSelect }: FileChangeListProps) {
   const t = useT();
+  const notify = useAppStore((state) => state.notify);
+
+  const handleCopyPath = async (path: string, event: React.MouseEvent) => {
+    event.stopPropagation();
+    const ok = await copyText(path);
+    notify(ok ? "success" : "error", ok ? t("settings.remotes.copied") : t("diff.copyFailure"));
+  };
+
   return (
     <ul className="py-1">
       {files.map((file) => {
@@ -41,7 +50,11 @@ export default function FileChangeList({ files, selectedPath, onSelect }: FileCh
                 {meta.letter}
               </span>
 
-              <span className="min-w-0 flex-1 truncate font-mono text-[11px] text-ink-soft">
+              <span
+                className="min-w-0 flex-1 truncate font-mono text-[11px] text-ink-soft"
+                onClick={(e) => void handleCopyPath(file.path, e)}
+                {...tip(file.path)}
+              >
                 {file.oldPath ? (
                   <>
                     <span className="text-ink-faint line-through decoration-ink-faint/40">

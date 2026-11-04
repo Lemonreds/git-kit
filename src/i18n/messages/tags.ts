@@ -26,7 +26,7 @@ export const zh = {
   "tags.remoteSummary": "远程 {remote}：{count} 个标签",
   "tags.remoteMissing": "该仓库没有远程地址，只显示本地标签",
   "tags.remoteFailure": "读取远程标签失败：{error}",
-  "tags.remoteOnlyHint": "远程还有 {count} 个本地没有的标签，可在终端执行 git fetch --tags 拉取",
+  "tags.remoteOnlyHint": "远程还有 {count} 个标签未拉取，可执行 git fetch --tags。",
   "tags.syncedAt": "同步于 {time}",
 
   "tags.emptyTitle": "还没有标签",
@@ -90,7 +90,7 @@ export const en: Record<keyof typeof zh, Message> = {
   "tags.remoteMissing": "This repository has no remote; only local tags are listed",
   "tags.remoteFailure": "Could not read the remote tags: {error}",
   "tags.remoteOnlyHint":
-    "{count} remote tags are missing locally — run git fetch --tags in a terminal to pull them",
+    "{count} remote tags are missing locally — use git fetch --tags.",
   "tags.syncedAt": "synced {time}",
 
   "tags.emptyTitle": "No tags yet",

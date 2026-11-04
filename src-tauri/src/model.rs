@@ -497,6 +497,38 @@ pub struct RepoOperationState {
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
+pub struct MergedBranch {
+    pub name: String,
+    pub commit: CommitSummary,
+}
+
+/// Local branches whose tip is already contained in the current `HEAD`: the
+/// candidates for "clean up merged branches".
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MergedBranchList {
+    /// What the comparison was made against (the checked-out branch name).
+    pub base: String,
+    pub branches: Vec<MergedBranch>,
+}
+
+/// One git hook file inside `.git/hooks`.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct HookInfo {
+    pub name: String,
+    /// The hook file exists (it may still be non-executable).
+    pub present: bool,
+    /// The file is executable, i.e. git will actually run it.
+    pub enabled: bool,
+    /// A `<name>.sample` template ships with this repository.
+    pub has_sample: bool,
+    pub size: u64,
+    pub modified_at: Option<i64>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct StashEntry {
     /// `stash@{0}` — safe to pass back to git.
     pub selector: String,

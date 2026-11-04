@@ -1,8 +1,8 @@
 import { useEffect } from "react";
 
-import { t } from "../i18n";
+import { COMMANDS, isAvailable, runCommand } from "../lib/commands";
+import { matchesBinding } from "../lib/keymap";
 import { useAppStore } from "../store/appStore";
-import { countUnresolved } from "../store/slices/conflictSlice";
 
 function isTypingTarget(target: EventTarget | null): boolean {
   const element = target as HTMLElement | null;
@@ -15,76 +15,37 @@ function isTypingTarget(target: EventTarget | null): boolean {
   );
 }
 
-/** Global shortcuts. Kept in one place so panels stay free of listeners. */
+/**
+ * Global shortcuts. The bindings come from `prefsSlice.keymap`, so the settings
+ * pane can rebind anything at runtime without this hook re-registering: every
+ * keydown reads the current map instead of capturing it.
+ */
 export function useHotkeys(): void {
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       const store = useAppStore.getState();
-      const withMeta = event.metaKey || event.ctrlKey;
 
       // A dialog owns the keyboard while it is open (Esc closes it, arrows move
-      // inside lists) — the panel shortcuts must not fire underneath.
+      // inside lists) — the panel shortcuts must not fire underneath. Dialog
+      // components handle their own keys, including the command palette.
       if (document.querySelector('[data-modal="true"]')) return;
 
-      if (withMeta && event.key.toLowerCase() === "o") {
-        event.preventDefault();
-        void store.addProject();
-        return;
-      }
-
-      if (withMeta && event.key.toLowerCase() === "r") {
-        event.preventDefault();
-        void store.refresh();
-        return;
-      }
-
-      // Deliberately above the typing guard: ⌘J must also work while the
-      // keystrokes are going into the terminal's own textarea.
-      if (withMeta && event.key.toLowerCase() === "j") {
-        event.preventDefault();
-        store.toggleTerminalPanel();
-        return;
-      }
-
-      // ⌘⇧T: tags pane. Also above the guard so it works from the search box.
-      if (withMeta && event.shiftKey && event.key.toLowerCase() === "t") {
-        event.preventDefault();
-        store.openTags();
-        return;
-      }
-
-      // ⌘S in the conflict resolver: write the resolution and stage the file.
-      if (withMeta && !event.shiftKey && event.key.toLowerCase() === "s") {
-        if (!store.conflictPath) return;
-        event.preventDefault();
-        if (store.conflictSaving || !store.conflictParsed) return;
-        const unresolved = countUnresolved(store.conflictParsed, store.conflictDrafts);
-        if (unresolved > 0) {
-          store.notify(
-            "info",
-            t("store.conflictUnresolvedFirst", { count: unresolved }),
-          );
+      const typing = isTypingTarget(event.target);
+      for (const command of COMMANDS) {
+        const binding = store.keymap[command.id];
+        if (!binding || !matchesBinding(event, binding)) continue;
+        // Owned by a component (the in-diff finder); it matches its own keys.
+        if (command.handledLocally) continue;
+        // A bare-key binding must not steal keystrokes from a text field.
+        if (!binding.mod && !binding.alt && typing) return;
+        if (!isAvailable(command, store)) continue;
+        if (runCommand(command.id, store)) {
+          event.preventDefault();
           return;
         }
-        void store.saveConflict();
-        return;
       }
 
-      // ⌘⇧H / ⌘⇧B: history / blame of the file the diff column is showing.
-      if (withMeta && event.shiftKey && (event.key.toLowerCase() === "h" || event.key.toLowerCase() === "b")) {
-        const blame = event.key.toLowerCase() === "b";
-        const target = store.worktreeTarget;
-        const path = target?.path ?? store.selectedFilePath;
-        if (!path) return;
-        const rev = target ? null : store.selectedCommitSha;
-        event.preventDefault();
-        void store.openFileHistory(path, rev).then(() => {
-          if (blame) store.setFileHistoryTab("blame");
-        });
-        return;
-      }
-
-      if (isTypingTarget(event.target)) return;
+      if (typing) return;
 
       if (event.key === "Escape") {
         // The resolver / file history take over the column: Esc steps out of

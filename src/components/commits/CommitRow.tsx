@@ -3,6 +3,7 @@ import type { CSSProperties } from "react";
 
 import { avatarHue, initials, relativeTime, timeTooltip } from "../../lib/format";
 import type { CommitSummary } from "../../lib/types";
+import Highlight from "../common/Highlight";
 import ShaChip from "../common/ShaChip";
 import { tip } from "../common/Tooltip";
 
@@ -10,9 +11,15 @@ interface CommitRowProps {
   commit: CommitSummary;
   active: boolean;
   onSelect: () => void;
+  /** Commit search text: matches are highlighted, the list is never filtered. */
+  query?: string;
+  /** This row is the match the search cursor is sitting on. */
+  matched?: boolean;
+  /** Row index, so the plain (non-virtualised) list can scroll to it. */
+  index?: number;
 }
 
-export default function CommitRow({ commit, active, onSelect }: CommitRowProps) {
+export default function CommitRow({ commit, active, onSelect, query, matched, index }: CommitRowProps) {
   const ref = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
@@ -24,10 +31,11 @@ export default function CommitRow({ commit, active, onSelect }: CommitRowProps) 
       ref={ref}
       type="button"
       onClick={onSelect}
+      data-commit-index={index}
       aria-current={active ? "true" : undefined}
       className={`flex w-full items-start gap-3 rounded-lg px-2 py-2.5 text-left transition-colors ${
         active ? "bg-accent-soft" : "hover:bg-ink/5"
-      }`}
+      } ${matched ? "ring-1 ring-inset ring-accent/45" : ""}`}
     >
       <span
         className="avatar mt-0.5 grid h-8 w-8 shrink-0 place-items-center rounded-full text-[11px] font-semibold"
@@ -42,10 +50,12 @@ export default function CommitRow({ commit, active, onSelect }: CommitRowProps) 
             active ? "font-medium text-ink" : "text-ink"
           }`}
         >
-          {commit.summary}
+          {query ? <Highlight text={commit.summary} query={query} /> : commit.summary}
         </span>
         <span className="mt-1 flex items-center gap-1.5 text-[10.5px] text-ink-faint">
-          <span className="max-w-[40%] truncate">{commit.authorName}</span>
+          <span className="max-w-[40%] truncate">
+            {query ? <Highlight text={commit.authorName} query={query} /> : commit.authorName}
+          </span>
           <span className="h-0.5 w-0.5 shrink-0 rounded-full bg-ink-faint/60" />
           <span className="shrink-0" {...tip(timeTooltip(commit.committedAt))}>
             {relativeTime(commit.committedAt)}

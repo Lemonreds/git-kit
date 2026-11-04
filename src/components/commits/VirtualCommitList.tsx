@@ -1,7 +1,8 @@
 import { Loader2 } from "lucide-react";
 import { useMemo } from "react";
 import { List, useDynamicRowHeight } from "react-window";
-import type { RowComponentProps } from "react-window";
+import type { ListImperativeAPI, RowComponentProps } from "react-window";
+import type { RefObject } from "react";
 
 import { useT } from "../../i18n";
 import type { CommitSummary } from "../../lib/types";
@@ -13,6 +14,10 @@ interface RowProps {
   loading: boolean;
   selectCommit: (sha: string) => void;
   loadMore: () => void;
+  /** Commit search text, only for highlighting. */
+  query: string;
+  /** Sha of the match the search cursor is on. */
+  matchSha: string | null;
 }
 
 /** Row heights vary: a summary can wrap to two lines. Measure instead of guess. */
@@ -26,6 +31,8 @@ function CommitListRow({
   loading,
   selectCommit,
   loadMore,
+  query,
+  matchSha,
 }: RowComponentProps<RowProps>) {
   const t = useT();
   if (index >= commits.length) {
@@ -56,6 +63,9 @@ function CommitListRow({
       <CommitRow
         commit={commit}
         active={commit.sha === selectedSha}
+        matched={matchSha !== null && commit.sha === matchSha}
+        query={query}
+        index={index}
         onSelect={() => selectCommit(commit.sha)}
       />
     </div>
@@ -71,6 +81,10 @@ interface VirtualCommitListProps {
   loadMore: () => void;
   /** Changing this drops the measured row heights (branch switch). */
   listKey: string;
+  /** Owned by the panel so the search can scroll to a match. */
+  listRef: RefObject<ListImperativeAPI | null>;
+  query: string;
+  matchSha: string | null;
 }
 
 /**
@@ -85,14 +99,17 @@ export default function VirtualCommitList({
   selectCommit,
   loadMore,
   listKey,
+  listRef,
+  query,
+  matchSha,
 }: VirtualCommitListProps) {
   const rowHeight = useDynamicRowHeight({
     defaultRowHeight: ESTIMATED_ROW_HEIGHT,
     key: listKey,
   });
   const rowProps = useMemo<RowProps>(
-    () => ({ commits, selectedSha, loading, selectCommit, loadMore }),
-    [commits, selectedSha, loading, selectCommit, loadMore],
+    () => ({ commits, selectedSha, loading, selectCommit, loadMore, query, matchSha }),
+    [commits, selectedSha, loading, selectCommit, loadMore, query, matchSha],
   );
 
   return (
@@ -102,6 +119,7 @@ export default function VirtualCommitList({
       className="h-full px-2 py-2"
       style={{ height: "100%" }}
       defaultHeight={520}
+      listRef={listRef}
       rowCount={commits.length + (hasMore ? 1 : 0)}
       rowHeight={rowHeight}
       rowProps={rowProps}

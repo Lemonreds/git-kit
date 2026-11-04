@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import {
   AlertTriangle,
+  Archive,
   ClipboardCopy,
   Columns2,
   Copy,
@@ -23,6 +24,7 @@ import { api } from "../../lib/ipc";
 import type { CommitDetail } from "../../lib/types";
 
 import { absoluteTime, copyText, formatCount, relativeTime, timeTooltip } from "../../lib/format";
+import { formatBinding, matchesBinding } from "../../lib/keymap";
 import { useAppStore } from "../../store/appStore";
 import { useSlice } from "../../store/hooks";
 import ConfirmDialog from "../common/ConfirmDialog";
@@ -45,6 +47,7 @@ export default function DiffPanel() {
     commits,
     worktreeTarget,
     selectedCommitSha,
+    stashPreview,
     files,
     filesLoading,
     selectedFilePath,
@@ -56,6 +59,7 @@ export default function DiffPanel() {
     commits: state.commits,
     worktreeTarget: state.worktreeTarget,
     selectedCommitSha: state.selectedCommitSha,
+    stashPreview: state.stashPreview,
     files: state.commitFiles,
     filesLoading: state.filesLoading,
     selectedFilePath: state.selectedFilePath,
@@ -92,6 +96,9 @@ export default function DiffPanel() {
   const [confirmDiscard, setConfirmDiscard] = useState(false);
 
   const commit = commits.find((item) => item.sha === selectedCommitSha) ?? null;
+  // A stash has no row in the commit list: the header shows the stash ref
+  // instead, and commit-only actions (tag / revert / details) stay hidden.
+  const previewLabel = stashPreview?.selector ?? null;
   const stats = files.reduce(
     (acc, file) => ({ additions: acc.additions + file.additions, deletions: acc.deletions + file.deletions }),
     { additions: 0, deletions: 0 },
@@ -119,7 +126,8 @@ export default function DiffPanel() {
   const [confirmRevert, setConfirmRevert] = useState(false);
 
   useEffect(() => {
-    if (!selectedCommitSha || !activeProject) {
+    // A stash ref is not a commit: `get_commit` would just 404 on it.
+    if (!selectedCommitSha || !activeProject || stashPreview) {
       setDetail(null);
       return;
     }
@@ -135,22 +143,26 @@ export default function DiffPanel() {
     return () => {
       alive = false;
     };
-  }, [selectedCommitSha, activeProject]);
+  }, [selectedCommitSha, activeProject, stashPreview]);
   const scrollRef = useRef<HTMLDivElement | null>(null);
 
-  // ⌘F / Ctrl+F opens the in-diff finder.
+  // The in-diff finder is a local command: the binding is user-editable, but
+  // the search state lives here, so this component does the matching.
+  const keymap = useAppStore((state) => state.keymap);
+  const findBinding = keymap.findInDiff;
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
-      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "f") {
-        event.preventDefault();
-        setSearchOpen(true);
-        // Re-focus (and re-select) the input when ⌘F is pressed again.
-        setSearchFocusKey((key) => key + 1);
-      }
+      if (!matchesBinding(event, findBinding)) return;
+      // A dialog (or the palette) owns the keyboard while it is open.
+      if (document.querySelector('[data-modal="true"]')) return;
+      event.preventDefault();
+      setSearchOpen(true);
+      // Re-focus (and re-select) the input when the key is pressed again.
+      setSearchFocusKey((key) => key + 1);
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, []);
+  }, [findBinding]);
 
   // New term -> start from the first match again.
   useEffect(() => {
@@ -250,7 +262,7 @@ export default function DiffPanel() {
               <button
                 type="button"
                 onClick={() => void openFileHistory(worktreeTarget.path, null)}
-                {...tip(t("fileHistory.openHint"), "⌘⇧H")}
+                {...tip(t("fileHistory.openHint"), formatBinding(keymap.fileHistory))}
                 className="no-drag inline-flex shrink-0 items-center gap-1 rounded px-1 py-px text-[10px] text-ink-faint transition-colors hover:bg-ink/6 hover:text-accent"
               >
                 <History size={10} />
@@ -389,6 +401,16 @@ export default function DiffPanel() {
                   </span>
                 ) : null}
               </>
+            ) : previewLabel ? (
+              <>
+                <Archive size={12} className="shrink-0 text-ink-faint" />
+                <code className="shrink-0 rounded bg-canvas px-1 py-px font-mono text-[10px] text-ink-soft">
+                  {previewLabel}
+                </code>
+                <span className="min-w-0 truncate text-[11.5px] text-ink">
+                  {stashPreview ? t("stash.previewTitle") : t("diff.comparison")}
+                </span>
+              </>
             ) : (
               <>
                 <FileDiffIcon size={12} className="shrink-0 text-ink-faint" />
@@ -414,23 +436,21 @@ export default function DiffPanel() {
                   <span className="ml-1 text-negative">−{stats.deletions}</span>
                 </span>
               </>
-            ) : (
-              <span className="truncate">{t("diff.selectCommit")}</span>
-            )}
+            ) : null}
           </div>
         </div>
 
         <div className="no-drag ml-1 flex shrink-0 items-center gap-1">
-          {selectedFilePath ? (
+          {selectedFilePath && !stashPreview ? (
             <IconButton
               label={t("fileHistory.openHint")}
-              shortcut="⌘⇧H"
+              shortcut={formatBinding(keymap.fileHistory)}
               onClick={() => void openFileHistory(selectedFilePath, selectedCommitSha)}
             >
               <History size={13} />
             </IconButton>
           ) : null}
-          {selectedCommitSha ? (
+          {selectedCommitSha && !stashPreview ? (
             <RowMenu
               label={t("common.more")}
               items={[
@@ -489,7 +509,7 @@ export default function DiffPanel() {
         </div>
       </header>
 
-      {selectedCommitSha && detailOpen && detail ? (
+      {selectedCommitSha && !stashPreview && detailOpen && detail ? (
         <div className="max-h-[38%] shrink-0 overflow-y-auto border-b border-line bg-canvas/40 px-3 py-2">
           <p className="whitespace-pre-wrap break-words text-[11.5px] leading-relaxed text-ink">
             {detail.message.trim() || detail.summary}
@@ -537,7 +557,7 @@ export default function DiffPanel() {
       ) : null}
 
       {!selectedCommitSha ? (
-        <EmptyState icon={FileDiffIcon} title={t("diff.selectCommit")} />
+        <EmptyState icon={FileDiffIcon} title={t("diff.comparison")} />
       ) : (
         <div className="flex min-h-0 flex-1 flex-col">
           <div className="max-h-[38%] shrink-0 overflow-y-auto border-b border-line bg-canvas/40">

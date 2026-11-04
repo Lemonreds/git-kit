@@ -4,12 +4,16 @@ use std::sync::Mutex;
 use tauri::State;
 
 use crate::error::AppError;
-use crate::git::{branches, commits, config, conflict, diff, history, ops, repo as git_repo, status, workflow};
+use crate::git::{
+    branches, commits, config, conflict, diff, history, hooks, ops, repo as git_repo, status,
+    workflow,
+};
 use crate::model::{
     AppSettings, BlameWindow, BranchSummary, BranchTemplate, CheckoutResult, CherryPickResult,
     CommitDetail, CommitFiles, CommitPage, CommitResult, ComparePreview, ConflictFile,
     ConflictFileDetail, CreateBranchResult, DeleteBranchesResult, DeleteTagResult,
-    FetchAllResult, FileDiff, FileHistoryPage, HeadCommitPreview, MergePreview, MergeResult,
+    FetchAllResult, FileDiff, FileHistoryPage, HeadCommitPreview, HookInfo, MergePreview,
+    MergeResult, MergedBranchList,
     ProjectList, ProjectStatus, ProjectView, PullPreview, PullResult, PushAllTagsResult,
     PushPreview, PushResult, RebasePreview, RebaseResult, ReflogEntry, RemoteBranchPage,
     RemoteInfo, RemoteTagPage, RemoveRemoteResult, RepoIdentity, RepoOperationState, RepoSnapshot,
@@ -269,6 +273,46 @@ pub fn list_remote_branches(
         limit,
         offset,
     })
+}
+
+#[tauri::command(async)]
+pub fn list_merged_branches(repo_path: String) -> Result<MergedBranchList, AppError> {
+    let repo = git_repo::open_repo(&repo_path)?;
+    branches::merged_branches(&repo)
+}
+
+#[tauri::command(async)]
+pub fn list_git_hooks(repo_path: String) -> Result<Vec<HookInfo>, AppError> {
+    hooks::list_hooks(Path::new(&repo_path))
+}
+
+#[tauri::command(async)]
+pub fn read_git_hook(repo_path: String, name: String) -> Result<String, AppError> {
+    hooks::read_hook(Path::new(&repo_path), &name)
+}
+
+#[tauri::command(async)]
+pub fn write_git_hook(
+    repo_path: String,
+    name: String,
+    content: String,
+    enabled: Option<bool>,
+) -> Result<Vec<HookInfo>, AppError> {
+    hooks::write_hook(Path::new(&repo_path), &name, &content, enabled.unwrap_or(true))
+}
+
+#[tauri::command(async)]
+pub fn set_git_hook_enabled(
+    repo_path: String,
+    name: String,
+    enabled: bool,
+) -> Result<Vec<HookInfo>, AppError> {
+    hooks::set_hook_enabled(Path::new(&repo_path), &name, enabled)
+}
+
+#[tauri::command(async)]
+pub fn delete_git_hook(repo_path: String, name: String) -> Result<Vec<HookInfo>, AppError> {
+    hooks::delete_hook(Path::new(&repo_path), &name)
 }
 
 #[tauri::command(async)]

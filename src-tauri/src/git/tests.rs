@@ -6,7 +6,7 @@ use git2::{Oid, Repository};
 use tempfile::TempDir;
 
 use crate::git::{
-    branches, commits, conflict, diff, history, ops, repo as git_repo, status, workflow,
+    branches, commits, conflict, diff, history, hooks, ops, repo as git_repo, status, workflow,
 };
 use crate::model::{ConflictKind, FileStatus};
 
@@ -756,4 +756,86 @@ fn file_history_of_an_untouched_path_is_empty() {
     let page = history::file_history(dir.path(), None, "nope.md", Some(20)).expect("history");
     assert!(page.entries.is_empty());
     assert!(!page.truncated);
+}
+
+// ---------------------------------------------------------------------------
+// Merged branch cleanup + hooks
+// ---------------------------------------------------------------------------
+
+fn commit_on(repo: &Repository, refname: &str, message: &str, parent: Oid) -> Oid {
+    let parent = repo.find_commit(parent).expect("parent");
+    let tree = parent.tree().expect("tree");
+    let signature = repo.signature().expect("signature");
+    repo.commit(Some(refname), &signature, &signature, message, &tree, &[&parent])
+        .expect("commit on ref")
+}
+
+#[test]
+fn merged_branches_splits_contained_from_unmerged() {
+    let (_dir, repo) = workspace();
+    let head = repo.head().expect("head").target().expect("oid");
+
+    // `merged-one` stays behind while HEAD advances: its tip is contained.
+    set_ref(&repo, "refs/heads/merged-one", head);
+    stage_file(&repo, "b.txt", "b\n");
+    let new_head = commit(&repo, "feat: advance");
+    // `unmerged-one` carries a commit HEAD does not have.
+    let dangling = commit_on(&repo, "refs/heads/unmerged-one", "feat: wip", new_head);
+
+    let list = branches::merged_branches(&repo).expect("merged");
+    let names: Vec<&str> = list.branches.iter().map(|branch| branch.name.as_str()).collect();
+    assert!(names.contains(&"merged-one"));
+    assert!(!names.contains(&"unmerged-one"));
+    assert!(
+        list.branches
+            .iter()
+            .all(|branch| branch.commit.sha != dangling.to_string()),
+        "a branch with unmerged commits must not be listed"
+    );
+    assert!(!list.base.is_empty());
+}
+
+#[test]
+fn hooks_round_trip_enable_and_delete() {
+    let (dir, _repo) = workspace();
+    let repo_path = dir.path();
+
+    // libgit2 does not install git's hook templates, write one by hand.
+    let hooks_dir = repo_path.join(".git").join("hooks");
+    fs::create_dir_all(&hooks_dir).expect("hooks dir");
+    fs::write(hooks_dir.join("pre-commit.sample"), "#!/bin/sh\nexit 0\n").expect("sample");
+
+    let listed = hooks::list_hooks(repo_path).expect("list");
+    let pre = listed
+        .iter()
+        .find(|hook| hook.name == "pre-commit")
+        .expect("pre-commit is always listed");
+    assert!(!pre.present);
+    assert!(pre.has_sample);
+
+    // Reading a hook that does not exist yet falls back to the sample.
+    let content = hooks::read_hook(repo_path, "pre-commit").expect("read");
+    assert!(content.contains("exit 0"));
+
+    hooks::write_hook(repo_path, "pre-commit", "#!/bin/sh\nexit 0\n", true).expect("write");
+    let after = hooks::list_hooks(repo_path).expect("list again");
+    let pre = after.iter().find(|hook| hook.name == "pre-commit").expect("listed");
+    assert!(pre.present);
+    assert!(pre.enabled);
+
+    hooks::set_hook_enabled(repo_path, "pre-commit", false).expect("disable");
+    let disabled = hooks::list_hooks(repo_path).expect("list disabled");
+    let pre = disabled.iter().find(|hook| hook.name == "pre-commit").expect("listed");
+    assert!(pre.present);
+    assert!(!pre.enabled);
+
+    // Names that would escape the hooks directory are refused.
+    assert!(hooks::write_hook(repo_path, "../evil", "x", true).is_err());
+    assert!(hooks::delete_hook(repo_path, "a/b").is_err());
+
+    hooks::delete_hook(repo_path, "pre-commit").expect("delete");
+    let gone = hooks::list_hooks(repo_path).expect("list gone");
+    let pre = gone.iter().find(|hook| hook.name == "pre-commit").expect("listed");
+    assert!(!pre.present);
+    assert!(pre.has_sample, "the .sample template must survive a delete");
 }

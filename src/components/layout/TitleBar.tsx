@@ -2,6 +2,7 @@ import { FolderGit2, FolderOpen, RefreshCw, Settings2, SquareTerminal } from "lu
 import { revealItemInDir } from "@tauri-apps/plugin-opener";
 
 import { useT } from "../../i18n";
+import { formatBinding } from "../../lib/keymap";
 import { shortPath } from "../../lib/format";
 import { useAppStore } from "../../store/appStore";
 import { useSlice } from "../../store/hooks";
@@ -24,6 +25,7 @@ export default function TitleBar() {
   const notify = useAppStore((state) => state.notify);
   const setSettingsOpen = useAppStore((state) => state.setSettingsOpen);
   const toggleTerminalPanel = useAppStore((state) => state.toggleTerminalPanel);
+  const keymap = useAppStore((state) => state.keymap);
 
   const reveal = async () => {
     if (!project) return;
@@ -76,7 +78,7 @@ export default function TitleBar() {
         </IconButton>
         <IconButton
           label={t("layout.refresh")}
-          shortcut="⌘R"
+          shortcut={formatBinding(keymap.refresh)}
           onClick={() => void refresh()}
           disabled={!project || refreshing}
         >
@@ -84,7 +86,7 @@ export default function TitleBar() {
         </IconButton>
         <IconButton
           label={terminalOpen ? t("layout.collapseTerminal") : t("layout.openTerminal")}
-          shortcut="⌘J"
+          shortcut={formatBinding(keymap.terminal)}
           active={terminalOpen}
           onClick={toggleTerminalPanel}
           disabled={!project}
@@ -97,7 +99,7 @@ export default function TitleBar() {
           aria-label={t("layout.settings")}
           aria-pressed={settingsOpen}
           onClick={() => setSettingsOpen(true)}
-          {...tip(t("layout.settings"))}
+          {...tip(t("layout.settings"), formatBinding(keymap.settings))}
           className={`inline-flex h-7 shrink-0 items-center gap-1 rounded-md px-1.5 text-[11px] font-medium transition-colors disabled:cursor-default disabled:opacity-35 ${
             settingsOpen
               ? "bg-accent-soft text-accent"

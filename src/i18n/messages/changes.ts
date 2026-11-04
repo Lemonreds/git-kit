@@ -30,7 +30,7 @@ export const zh = {
   "changes.discardFileDescription": "将丢弃「{path}」的未提交修改，该操作不可撤销。",
   "changes.discardFileConfirm": "放弃改动",
   "changes.discardAllDescription":
-    "将丢弃当前分支所有未提交的修改（含 {count} 个文件），并删除未跟踪的新文件，该操作不可撤销。",
+    "丢弃当前分支全部未提交改动（含 {count} 个文件）并删除未跟踪文件，不可撤销。",
   "changes.discardAllConfirm": "全部放弃",
   "changes.untracked": "未跟踪",
   "changes.stageFile": "暂存此文件",
@@ -65,7 +65,7 @@ export const zh = {
   "changes.amendToggle": "修正上一次提交（amend）",
   "changes.skipHooksToggle": "跳过提交前置检查（-n）",
   "changes.skipHooksHelp":
-    "加 --no-verify：跳过 pre-commit / commit-msg 钩子，适合钩子报错却又暂时提交不下去时使用；默认不跳过。",
+    "加 --no-verify，跳过 pre-commit / commit-msg 钩子。默认不跳过。",
   "changes.amendFilesPreview": "{count} 个文件",
   "changes.amendFilesPushedPreview": "{count} 个文件 · 已推送",
   "changes.amendPushedToast": "该提交已推送过，修正后需要强制推送",
@@ -77,7 +77,7 @@ export const zh = {
   "changes.fileCount": "{count} 个",
   "changes.commitMessageLabel": "提交信息",
   "changes.commitMessageHelp":
-    "只提交暂存区（git commit，不带 -a），复用你的 hooks 与身份配置；为避免无终端时签名提示卡住，不启用 GPG 签名。⌘↵ 快速提交。",
+    "只提交暂存区（不带 -a），复用 hooks 与身份配置；不启用 GPG 签名，避免无终端时卡住。⌘↵ 快速提交。",
   "changes.messagePlaceholder": "feat: 简短说明这次改动\n\n可选：补充原因或影响范围",
 } satisfies Record<string, Message>;
 
@@ -119,9 +119,9 @@ export const en: Record<keyof typeof zh, Message> = {
     'Uncommitted changes to "{path}" will be discarded. This cannot be undone.',
   "changes.discardFileConfirm": "Discard changes",
   "changes.discardAllDescription": {
-    one: "Every uncommitted change on this branch ({count} file) will be discarded and new untracked files will be deleted. This cannot be undone.",
+    one: "Discards every uncommitted change on this branch ({count} file) and deletes new untracked files. Cannot be undone.",
     other:
-      "Every uncommitted change on this branch ({count} files) will be discarded and new untracked files will be deleted. This cannot be undone.",
+      "Discards every uncommitted change on this branch ({count} files) and deletes new untracked files. Cannot be undone.",
   },
   "changes.discardAllConfirm": "Discard all",
   "changes.untracked": "Untracked",
@@ -163,7 +163,7 @@ export const en: Record<keyof typeof zh, Message> = {
   "changes.amendToggle": "Amend the last commit (amend)",
   "changes.skipHooksToggle": "Skip commit hooks (-n)",
   "changes.skipHooksHelp":
-    "Adds --no-verify, skipping the pre-commit / commit-msg hooks. Useful when a hook keeps failing and you still need the commit; off by default.",
+    "Adds --no-verify, skipping the pre-commit / commit-msg hooks. Off by default.",
   "changes.amendFilesPreview": { one: "{count} file", other: "{count} files" },
   "changes.amendFilesPushedPreview": {
     one: "{count} file - pushed",
@@ -182,7 +182,7 @@ export const en: Record<keyof typeof zh, Message> = {
   "changes.fileCount": { one: "{count} file", other: "{count} files" },
   "changes.commitMessageLabel": "Commit message",
   "changes.commitMessageHelp":
-    "Commits the index only (git commit, without -a) and reuses your hooks and identity settings. GPG signing stays off so a missing terminal cannot hang on a signing prompt. ⌘↵ commits quickly.",
+    "Commits the index only (no -a) and reuses your hooks and identity. GPG signing stays off so a missing terminal cannot hang. ⌘↵ commits quickly.",
   "changes.messagePlaceholder":
     "feat: short summary of the change\n\nOptional: why it was made or what it affects",
 };

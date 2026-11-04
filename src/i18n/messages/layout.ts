@@ -5,7 +5,7 @@ export const zh = {
   "layout.revealFailed": "无法在 Finder 中打开该文件夹",
   "layout.refresh": "刷新",
   "layout.uncommitted": "未提交",
-  "layout.dirtyHint": "工作区存在未提交的改动，点击查看",
+  "layout.dirtyHint": "有未提交的改动，点击查看",
   "layout.collapseTerminal": "收起终端",
   "layout.openTerminal": "在终端中打开当前项目",
   "layout.settings": "设置",
@@ -23,10 +23,7 @@ export const zh = {
   "workspace.remove": "移除项目",
 
   "workspace.tabBranches": "分支",
-  "workspace.tabTags": "标签",
   "workspace.tabChanges": "改动",
-  "workspace.tagsTip": "查看本仓库的全部标签，支持搜索、新建与删除",
-  "workspace.changesTip": "当前分支的未提交改动",
 
   "workspace.opMerge": "Merge 进行中",
   "workspace.opRebase": "Rebase 进行中",
@@ -42,9 +39,9 @@ export const zh = {
   "workspace.branchTip": "当前分支：{branch}",
   "workspace.noBranch": "无分支",
   "workspace.detachedTip": "当前为游离 HEAD 或无分支",
-  "workspace.dirtyTip": "当前分支有未提交的改动",
+  "workspace.dirtyTip": "有未提交的改动",
   "workspace.remoteTip": "远程地址：{url}",
-  "workspace.noRemoteTip": "未配置远程地址，点击在设置里添加",
+  "workspace.noRemoteTip": "未配置远程，点击添加",
   "workspace.noRemote": "未配置远程地址",
 } satisfies Record<string, Message>;
 
@@ -53,7 +50,7 @@ export const en: Record<keyof typeof zh, Message> = {
   "layout.revealFailed": "Could not open this folder in Finder",
   "layout.refresh": "Refresh",
   "layout.uncommitted": "Uncommitted",
-  "layout.dirtyHint": "The workspace has uncommitted changes, click to view",
+  "layout.dirtyHint": "Uncommitted changes — click to view",
   "layout.collapseTerminal": "Hide the terminal",
   "layout.openTerminal": "Open the current project in the terminal",
   "layout.settings": "Settings",
@@ -72,10 +69,7 @@ export const en: Record<keyof typeof zh, Message> = {
   "workspace.remove": "Remove project",
 
   "workspace.tabBranches": "Branches",
-  "workspace.tabTags": "Tags",
   "workspace.tabChanges": "Changes",
-  "workspace.tagsTip": "All tags of this repository — search, create and delete",
-  "workspace.changesTip": "Uncommitted changes on the current branch",
 
   "workspace.opMerge": "Merge in progress",
   "workspace.opRebase": "Rebase in progress",
@@ -91,8 +85,8 @@ export const en: Record<keyof typeof zh, Message> = {
   "workspace.branchTip": "Current branch: {branch}",
   "workspace.noBranch": "No branch",
   "workspace.detachedTip": "Detached HEAD or no branch",
-  "workspace.dirtyTip": "This branch has uncommitted changes",
+  "workspace.dirtyTip": "Uncommitted changes",
   "workspace.remoteTip": "Remote URL: {url}",
-  "workspace.noRemoteTip": "No remote configured, click to add one in settings",
+  "workspace.noRemoteTip": "No remote — click to add one",
   "workspace.noRemote": "No remote configured",
 };

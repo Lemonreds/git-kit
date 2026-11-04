@@ -8,6 +8,10 @@ export const zh = {
 
   "settings.tab.general": "通用",
   "settings.tab.generalHint": "主题与语言",
+  "settings.tab.shortcuts": "快捷键",
+  "settings.tab.shortcutsHint": "自定义键盘操作",
+  "settings.tab.hooks": "Git 钩子",
+  "settings.tab.hooksHint": "启用 / 编辑仓库脚本",
   "settings.tab.remotes": "远程仓库",
   "settings.tab.remotesHint": "绑定 / 删除远程地址",
   "settings.tab.identity": "提交身份",
@@ -16,16 +20,17 @@ export const zh = {
   "settings.tab.templatesHint": "新建分支的命名规则",
 
   "settings.subtitle.general": "所有仓库公用，立即生效",
+  "settings.subtitle.shortcuts": "所有仓库公用，立即生效",
+  "settings.subtitle.hooks": "仅作用于当前仓库",
   "settings.subtitle.remotes": "可为下面选中的仓库单独配置远程地址",
   "settings.subtitle.identity": "仅作用于当前仓库",
   "settings.subtitle.templates": "所有仓库公用",
 
   "settings.appearance.theme": "主题",
-  "settings.appearance.themeHint": "切换后立即生效，不需要重启。默认浅色。",
   "settings.appearance.light": "浅色",
   "settings.appearance.dark": "深色",
+  "settings.appearance.system": "跟随系统",
   "settings.appearance.language": "界面语言",
-  "settings.appearance.languageHint": "切换后立即生效，不需要重启。",
   "settings.appearance.preview": "预览",
 
   "settings.remotes.noRepo": "未选择仓库",
@@ -44,7 +49,7 @@ export const zh = {
   "settings.remotes.remove": "删除远程仓库",
   "settings.remotes.addTitle": "添加远程仓库",
   "settings.remotes.addHelp":
-    "支持 HTTPS、SSH 与 git@host:org/repo.git 形式。只校验名称格式与重名，不联网验证可达性；推送 / 拉取时才会真正访问。",
+    "支持 HTTPS、SSH 和 git@host:org/repo.git。只校验格式与重名，不联网验证。",
   "settings.remotes.nameLabel": "名称",
   "settings.remotes.urlLabel": "地址",
   "settings.remotes.add": "添加",
@@ -55,12 +60,12 @@ export const zh = {
     "已删除远程仓库 {name}，同时清理了 {count} 个远程跟踪分支",
   "settings.remotes.removeTitle": "删除远程仓库 {name}？",
   "settings.remotes.removeDescription":
-    "会同时删除 refs/remotes/{name}/* 下 {count} 个跟踪分支；本地分支与服务器不受影响，原跟踪它的分支需重新指定远程。",
+    "会同时删除 refs/remotes/{name}/* 下 {count} 个跟踪分支；本地分支与服务器不受影响。",
   "settings.remotes.removeConfirm": "删除远程仓库",
 
   "settings.identity.sectionTitle": "当前仓库的提交身份",
   "settings.identity.help":
-    "只写入当前仓库的 .git/config（git config --local），不会改动其它仓库；保存后本仓库新的提交会用这个身份。",
+    "只写入本仓库的 .git/config（git config --local），不影响其它仓库。",
   "settings.identity.loading": "正在读取提交身份…",
   "settings.identity.nameLabel": "提交用户名",
   "settings.identity.namePlaceholder": "例如：Zhang San",
@@ -82,7 +87,7 @@ export const zh = {
   "settings.templates.namePlaceholder": "例如：生产基线",
   "settings.templates.ruleLabel": "模板规则",
   "settings.templates.ruleHelp":
-    "用 {date} 表示日期占位符，其余字符固定。例如 prod_{date}_BASE 会生成 prod_20261029_BASE。",
+    "{date} 是日期占位符，其余字符固定。例如 prod_{date}_BASE → prod_20261029_BASE。",
   "settings.templates.insertDate": "插入日期",
   "settings.templates.insertDateTip": "在光标处插入日期占位符",
   "settings.templates.dateToken": "日期",
@@ -104,6 +109,10 @@ export const en: Record<keyof typeof zh, Message> = {
 
   "settings.tab.general": "General",
   "settings.tab.generalHint": "Theme and language",
+  "settings.tab.shortcuts": "Shortcuts",
+  "settings.tab.shortcutsHint": "Customize keyboard actions",
+  "settings.tab.hooks": "Git hooks",
+  "settings.tab.hooksHint": "Enable / edit repo scripts",
   "settings.tab.remotes": "Remotes",
   "settings.tab.remotesHint": "Add / remove remote URLs",
   "settings.tab.identity": "Commit identity",
@@ -112,16 +121,17 @@ export const en: Record<keyof typeof zh, Message> = {
   "settings.tab.templatesHint": "Naming rules for new branches",
 
   "settings.subtitle.general": "Shared by every repository, applied immediately",
+  "settings.subtitle.shortcuts": "Shared by every repository, applied immediately",
+  "settings.subtitle.hooks": "Applies to the current repository only",
   "settings.subtitle.remotes": "Each repository below can have its own remotes",
   "settings.subtitle.identity": "Applies to the current repository only",
   "settings.subtitle.templates": "Shared by every repository",
 
   "settings.appearance.theme": "Theme",
-  "settings.appearance.themeHint": "Takes effect immediately, no restart needed. Light by default.",
   "settings.appearance.light": "Light",
   "settings.appearance.dark": "Dark",
+  "settings.appearance.system": "System",
   "settings.appearance.language": "Language",
-  "settings.appearance.languageHint": "Takes effect immediately, no restart needed.",
   "settings.appearance.preview": "Preview",
 
   "settings.remotes.noRepo": "No repository selected",
@@ -141,7 +151,7 @@ export const en: Record<keyof typeof zh, Message> = {
   "settings.remotes.remove": "Remove remote",
   "settings.remotes.addTitle": "Add a remote",
   "settings.remotes.addHelp":
-    "Accepts HTTPS, SSH, and git@host:org/repo.git URLs. Only the name format and duplicates are checked; reachability is verified when you push or pull.",
+    "Accepts HTTPS, SSH and git@host:org/repo.git. Only the format and duplicates are checked; reachability is verified on push or pull.",
   "settings.remotes.nameLabel": "Name",
   "settings.remotes.urlLabel": "URL",
   "settings.remotes.add": "Add",
@@ -154,15 +164,15 @@ export const en: Record<keyof typeof zh, Message> = {
   },
   "settings.remotes.removeTitle": "Remove remote {name}?",
   "settings.remotes.removeDescription": {
-    one: "This also deletes {count} tracking branch under refs/remotes/{name}/*. Local branches and the server are untouched, but branches that tracked it need a new remote.",
+    one: "Also deletes {count} tracking branch under refs/remotes/{name}/*. Local branches and the server are untouched.",
     other:
-      "This also deletes {count} tracking branches under refs/remotes/{name}/*. Local branches and the server are untouched, but branches that tracked it need a new remote.",
+      "Also deletes {count} tracking branches under refs/remotes/{name}/*. Local branches and the server are untouched.",
   },
   "settings.remotes.removeConfirm": "Remove remote",
 
   "settings.identity.sectionTitle": "Commit identity for this repository",
   "settings.identity.help":
-    "Only writes this repository's .git/config (git config --local); no other repository is touched. New commits here use this identity once saved.",
+    "Writes only this repository's .git/config (git config --local).",
   "settings.identity.loading": "Loading commit identity...",
   "settings.identity.nameLabel": "Commit user name",
   "settings.identity.namePlaceholder": "e.g. Zhang San",
@@ -172,9 +182,9 @@ export const en: Record<keyof typeof zh, Message> = {
   "settings.identity.source.localHint": "From this repository's .git/config",
   "settings.identity.source.global": "Global",
   "settings.identity.source.globalHint":
-    "Not set for this repository, so the effective value comes from the existing config. Saving writes it to this repository's .git/config.",
+    "In effect from the existing config; saving writes this repository's .git/config",
   "settings.identity.source.none": "Not set",
-  "settings.identity.source.noneHint": "No commit identity is in effect, so git will refuse to commit",
+  "settings.identity.source.noneHint": "No identity in effect — git will refuse to commit",
 
   "settings.templates.empty": "No templates yet. Create one to get started.",
   "settings.templates.untitled": "Untitled template",
@@ -185,7 +195,7 @@ export const en: Record<keyof typeof zh, Message> = {
   "settings.templates.namePlaceholder": "e.g. Production baseline",
   "settings.templates.ruleLabel": "Template rule",
   "settings.templates.ruleHelp":
-    "{date} stands for the date placeholder, every other character is literal. For example prod_{date}_BASE renders prod_20261029_BASE.",
+    "{date} is the date placeholder, everything else is literal: prod_{date}_BASE → prod_20261029_BASE.",
   "settings.templates.insertDate": "Insert date",
   "settings.templates.insertDateTip": "Insert the date placeholder at the cursor",
   "settings.templates.dateToken": "Date",

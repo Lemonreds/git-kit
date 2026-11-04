@@ -7,6 +7,8 @@ import { useSlice } from "../../store/hooks";
 import { TERMINAL_HEIGHT } from "../../store/slices/terminalSlice";
 import DiffPanel from "../diff/DiffPanel";
 import ProjectSidebar from "../projects/ProjectSidebar";
+import CommandPalette from "../shortcuts/CommandPalette";
+import RunWorkflowDialog from "../workflow/RunWorkflowDialog";
 import AlertDialog from "../common/AlertDialog";
 import Toast from "../common/Toast";
 import TooltipLayer from "../common/Tooltip";
@@ -149,6 +151,8 @@ export default function AppShell() {
         ) : null}
 
         <Toast />
+        <CommandPalette />
+        <RunWorkflowDialog />
         <AlertDialog />
         <TooltipLayer />
       </div>

@@ -139,6 +139,7 @@ export function clearDetail() {
     commits: [] as CommitPage["commits"],
     commitsLoading: false,
     commitsHasMore: false,
+    commitSearchOpen: false,
     selectedCommitSha: null,
     commitFiles: [] as FileChange[],
     filesLoading: false,
@@ -146,6 +147,7 @@ export function clearDetail() {
     diff: null,
     diffLoading: false,
     worktreeTarget: null,
+    stashPreview: null,
     changesLoading: false,
     // The resolver and the file-history view belong to the repository that was
     // open when they started, so leaving that context closes them too.

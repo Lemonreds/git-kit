@@ -3,9 +3,9 @@ use std::collections::HashSet;
 use git2::{Branch, BranchType, Repository};
 
 use crate::error::AppError;
-use crate::model::BranchSummary;
+use crate::model::{BranchSummary, MergedBranch, MergedBranchList};
 
-use super::repo::{remote_branch_name, summarize};
+use super::repo::{head_branch, remote_branch_name, summarize};
 
 /// How many remote branches the panel loads at a time (「加载更多」+this).
 pub const REMOTE_BRANCH_PAGE: usize = 10;
@@ -200,4 +200,63 @@ pub fn list_remote_branches(
 pub fn count_remote_branches(repo: &Repository) -> Result<usize, AppError> {
     let locals = local_names(repo);
     Ok(collect(repo, BranchType::Remote, &locals)?.len())
+}
+
+/// Local branches whose tip is already contained in the current `HEAD`.
+///
+/// This is the "delete merged branches" candidate list: it is a pure read, so
+/// the UI can show it with checkboxes and let `delete_local_branches` do the
+/// actual removal (which still refuses the checked-out branch).
+pub fn merged_branches(repo: &Repository) -> Result<MergedBranchList, AppError> {
+    let head = repo
+        .head()
+        .map_err(|_| AppError::message("仓库还没有任何提交"))?;
+    let base_commit = head
+        .peel_to_commit()
+        .map_err(|err| AppError::message(format!("无法读取当前提交：{err}")))?;
+    let base = head_branch(repo).unwrap_or_else(|| super::repo::short_id(&base_commit));
+
+    let mut branches: Vec<MergedBranch> = Vec::new();
+    let local = repo
+        .branches(Some(BranchType::Local))
+        .map_err(|err| AppError::message(format!("无法读取本地分支：{err}")))?;
+
+    for entry in local.flatten() {
+        let (branch, _) = entry;
+        let Ok(Some(name)) = branch.name() else {
+            continue;
+        };
+        if name == base {
+            continue;
+        }
+        let Some(target) = branch.get().target() else {
+            continue;
+        };
+        if target == base_commit.id() {
+            continue;
+        }
+        let merged = repo
+            .graph_descendant_of(base_commit.id(), target)
+            .unwrap_or(false);
+        if !merged {
+            continue;
+        }
+        let Ok(commit) = branch.get().peel_to_commit() else {
+            continue;
+        };
+        branches.push(MergedBranch {
+            name: name.to_string(),
+            commit: summarize(&commit),
+        });
+    }
+
+    // Newest first: the branch merged a minute ago is the usual cleanup target.
+    branches.sort_by(|a, b| {
+        b.commit
+            .committed_at
+            .cmp(&a.commit.committed_at)
+            .then_with(|| a.name.cmp(&b.name))
+    });
+
+    Ok(MergedBranchList { base, branches })
 }

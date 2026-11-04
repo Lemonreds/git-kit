@@ -139,24 +139,29 @@ export const createProjectSlice: StateCreator<AppState, [], [], ProjectSlice> = 
       // Settle independently: a failed worktree scan must not hide the branch
       // list, and a failed branch scan must not block the repository footer.
       // Tags ride along so the tags pane has its list ready without a second read.
-      const [snapshotResult, branchesResult, changesResult, tagsResult] = await Promise.allSettled([
-        api.repoSnapshot(project.path),
-        api.listBranches(project.path),
-        api.worktreeStatus(project.path),
-        api.listTags(project.path),
-      ]);
+      const [snapshotResult, branchesResult, changesResult, tagsResult, stashResult] =
+        await Promise.allSettled([
+          api.repoSnapshot(project.path),
+          api.listBranches(project.path),
+          api.worktreeStatus(project.path),
+          api.listTags(project.path),
+          // The stash badge on its tab is only useful if it is read on load.
+          api.stashList(project.path),
+        ]);
       if (epoch !== token.project) return;
 
       const snapshot = snapshotResult.status === "fulfilled" ? snapshotResult.value : null;
       const branches = branchesResult.status === "fulfilled" ? branchesResult.value : [];
       const changes = changesResult.status === "fulfilled" ? changesResult.value : null;
       const tags = tagsResult.status === "fulfilled" ? tagsResult.value : [];
+      const stashEntries = stashResult.status === "fulfilled" ? stashResult.value.entries : [];
 
       set((state) => ({
         snapshot,
         branches,
         changes,
         tags,
+        stashEntries,
         branchesLoading: false,
         tagsLoading: false,
         projects: state.projects.map((item) =>
@@ -354,6 +359,7 @@ export const createProjectSlice: StateCreator<AppState, [], [], ProjectSlice> = 
       set({ refreshing: false });
       void get().refreshRepoState();
       if (get().pane === "tags") void get().refreshTags();
+      if (get().pane === "stash") void get().refreshStashes();
     },
   };
 };

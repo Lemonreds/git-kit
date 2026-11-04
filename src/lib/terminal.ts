@@ -70,6 +70,13 @@ interface Attachment {
   observer: ResizeObserver | null;
   /** Keystrokes typed before the pty finished opening. */
   pendingInput: string[];
+  /**
+   * OSC 10/11 handlers that keep xterm.js from answering the colour queries
+   * itself. The answer is produced in Rust, on the pty stream (see the
+   * `ColorQueryResponder` there); a second reply would land in the CLI's input
+   * buffer as stray keystrokes.
+   */
+  colorQueries: { dispose: () => void }[];
   queued: number;
   /** Rust asked to stop pushing because the write queue is deep. */
   throttled: boolean;
@@ -90,6 +97,10 @@ const attachments = new Map<string, Attachment>();
  * The terminal is deliberately theme-independent: the app theme no longer touches
  * it (a dark palette inside a light shell, or the reverse, has bitten us more
  * than once). One literal light palette, always.
+ *
+ * "Light" is a promise to the child process, not just a paint colour: programs
+ * ask for the background (OSC 10/11, answered in Rust) or read `COLORFGBG` (also
+ * set in Rust) before they choose a palette of their own. Keep the two in sync.
  */
 const TERMINAL_THEME: XtermTheme = {
   background: "#ffffff",
@@ -153,6 +164,7 @@ export async function attachTerminal(
     host,
     observer: null,
     pendingInput: [],
+    colorQueries: [],
     queued: 0,
     throttled: false,
     visible: true,
@@ -187,6 +199,20 @@ export async function attachTerminal(
   const fitAddon = new FitAddon();
   term.loadAddon(fitAddon);
   term.open(host);
+
+  // The terminal is light, and the child process has to be told: Claude Code and
+  // Codex both pick their light/dark palette from an OSC 11 background query and
+  // fall back to *dark* when nobody answers (black code blocks on a white page).
+  // Rust answers that query the moment it shows up on the pty — the alternative,
+  // letting xterm.js reply, would have to travel pty → Rust → webview → xterm's
+  // write queue → `onData` → IPC → Rust, and never happens at all while the panel
+  // is paused. Two answers are worse than one, so only the *query* form is
+  // swallowed here (`OSC 11 ; rgb:…` still sets a colour, as before).
+  const isColorQuery = (data: string) => data.trim() === "?";
+  attachment.colorQueries = [
+    term.parser.registerOscHandler(10, isColorQuery),
+    term.parser.registerOscHandler(11, isColorQuery),
+  ];
 
   attachment.term = term;
   attachment.fit = fitAddon;
@@ -375,6 +401,8 @@ export function disposeTerminal(key: string): void {
   if (!attachment) return;
   attachments.delete(key);
   attachment.disposed = true;
+  for (const handler of attachment.colorQueries) handler.dispose();
+  attachment.colorQueries = [];
   if (attachment.fitFrame) cancelAnimationFrame(attachment.fitFrame);
   attachment.observer?.disconnect();
   attachment.observer = null;

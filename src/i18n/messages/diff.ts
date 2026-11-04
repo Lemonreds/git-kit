@@ -33,7 +33,6 @@ export const zh = {
   "diff.parents": "父提交",
   "diff.addTag": "打标签",
   "diff.revertThisCommit": "撤销此提交",
-  "diff.selectCommit": "选择一个提交",
   "diff.noFileChanges": "该提交没有文件改动。",
   "diff.selectFileTitle": "选择文件查看改动",
   "diff.selectFileDescription": "在文件列表中选择文件即可查看逐行差异。",
@@ -48,7 +47,7 @@ export const zh = {
   "diff.viewFullFileTooltip": "查看完整文件内容",
   "diff.viewFullFile": "查看完整文件",
   "diff.truncatedNotice": "文件较大，仅展示部分改动内容。",
-  "diff.largeFileNotice": "文件改动超过 {threshold} 行，已自动切换为 unified 模式以优化性能。",
+  "diff.largeFileNotice": "改动超过 {threshold} 行，已切到 unified 模式。",
   "diff.rowsShown": "已显示 {visible} / {total} 行 · 继续向下滚动会自动加载",
   "diff.showAllRows": "全部显示",
   "diff.noLineChanges": "没有可显示的行级改动（可能是文件模式、权限或空行变化）。",
@@ -93,7 +92,6 @@ export const en: Record<keyof typeof zh, Message> = {
   "diff.parents": "Parents",
   "diff.addTag": "Add tag",
   "diff.revertThisCommit": "Revert this commit",
-  "diff.selectCommit": "Select a commit",
   "diff.noFileChanges": "This commit has no file changes.",
   "diff.selectFileTitle": "Select a file to view changes",
   "diff.selectFileDescription": "Pick a file in the list to see its line-by-line diff.",
@@ -110,7 +108,7 @@ export const en: Record<keyof typeof zh, Message> = {
   "diff.viewFullFile": "View full file",
   "diff.truncatedNotice": "This file is large, so only part of the diff is shown.",
   "diff.largeFileNotice":
-    "This file has more than {threshold} changed lines, so it was switched to unified mode for performance.",
+    "More than {threshold} changed lines — switched to unified mode.",
   "diff.rowsShown": "Showing {visible} / {total} rows · scroll down to load more",
   "diff.showAllRows": "Show all",
   "diff.noLineChanges":

@@ -5,7 +5,7 @@ import type { Theme } from "../../lib/theme";
 import { useAppStore } from "../../store/appStore";
 import { useSlice } from "../../store/hooks";
 
-const THEMES: Theme[] = ["light", "dark"];
+const THEMES: Theme[] = ["light", "dark", "system"];
 
 /**
  * Theme + language, the two preferences that are not tied to a repository.
@@ -24,16 +24,19 @@ export default function AppearancePanel() {
     <div className="max-w-[520px] space-y-6">
       <section>
         <h3 className="text-[12px] font-medium text-ink">{t("settings.appearance.theme")}</h3>
-        <p className="mt-0.5 text-[10.5px] leading-relaxed text-ink-faint">
-          {t("settings.appearance.themeHint")}
-        </p>
         <div role="radiogroup" aria-label={t("settings.appearance.theme")} className="mt-3 flex gap-3">
           {THEMES.map((id) => (
             <ThemeCard
               key={id}
               id={id}
               selected={theme === id}
-              label={id === "light" ? t("settings.appearance.light") : t("settings.appearance.dark")}
+              label={
+                id === "light"
+                  ? t("settings.appearance.light")
+                  : id === "dark"
+                    ? t("settings.appearance.dark")
+                    : t("settings.appearance.system")
+              }
               onSelect={() => setTheme(id)}
             />
           ))}
@@ -42,9 +45,6 @@ export default function AppearancePanel() {
 
       <section>
         <h3 className="text-[12px] font-medium text-ink">{t("settings.appearance.language")}</h3>
-        <p className="mt-0.5 text-[10.5px] leading-relaxed text-ink-faint">
-          {t("settings.appearance.languageHint")}
-        </p>
         <div
           role="radiogroup"
           aria-label={t("settings.appearance.language")}

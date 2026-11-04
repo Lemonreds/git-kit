@@ -1,6 +1,9 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 
+import { splitShortcutLabel } from "../../lib/keymap";
+import Keycap from "./Keycap";
+
 /**
  * Tooltip attributes to spread on any element. A single delegated layer
  * (`<TooltipLayer />`, mounted once in AppShell) renders the bubble, so adding
@@ -197,9 +200,11 @@ export default function TooltipLayer() {
       <div className="relative rounded-lg border border-line bg-raised px-2 py-1.5 text-[11px] leading-snug text-ink shadow-float">
         <span className="whitespace-pre-line font-medium">{active.label}</span>
         {active.shortcut ? (
-          <kbd className="ml-1.5 rounded border border-line bg-canvas px-1 py-px align-middle font-mono text-[9.5px] font-normal text-ink-faint">
-            {active.shortcut}
-          </kbd>
+          <Keycap
+            keys={splitShortcutLabel(active.shortcut)}
+            size="sm"
+            className="ml-1.5 align-middle"
+          />
         ) : null}
         <span
           aria-hidden

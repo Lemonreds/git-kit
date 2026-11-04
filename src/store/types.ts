@@ -1,6 +1,12 @@
 import type { DeleteFailure, RebaseResult } from "../lib/types";
 
-export type PaneMode = "branches" | "commits" | "changes" | "tags";
+export type PaneMode =
+  | "branches"
+  | "commits"
+  | "changes"
+  | "tags"
+  | "stash"
+  | "workflows";
 export type DiffMode = "unified" | "split";
 export type ToastKind = "info" | "success" | "error";
 
@@ -13,6 +19,12 @@ export interface Toast {
 export interface AlertMessage {
   title: string;
   message: string;
+}
+
+/** The stash whose diff the detail column is showing (`stash@{index}`). */
+export interface StashPreview {
+  index: number;
+  selector: string;
 }
 
 export interface WorktreeTarget {

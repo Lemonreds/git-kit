@@ -383,6 +383,28 @@ export interface RebaseResult {
   output: string;
 }
 
+/** Local branch whose tip is already contained in the current HEAD. */
+export interface MergedBranch {
+  name: string;
+  commit: CommitSummary;
+}
+
+export interface MergedBranchList {
+  /** The branch the comparison was made against (the checked-out one). */
+  base: string;
+  branches: MergedBranch[];
+}
+
+/** One file in `.git/hooks`: present / enabled are separate on purpose. */
+export interface HookInfo {
+  name: string;
+  present: boolean;
+  enabled: boolean;
+  hasSample: boolean;
+  size: number;
+  modifiedAt: number | null;
+}
+
 export interface DeleteFailure {
   name: string;
   reason: string;

@@ -14,9 +14,17 @@ export interface CommitsSlice {
   commits: CommitSummary[];
   commitsLoading: boolean;
   commitsHasMore: boolean;
+  /**
+   * Visibility of the commit search bar. It lives in the store (not in the
+   * panel) so the ⌘G command can open it from anywhere, including the palette.
+   */
+  commitSearchOpen: boolean;
+  setCommitSearchOpen: (open: boolean) => void;
 
   openBranch: (refName: string) => Promise<void>;
   openTagCommits: (tag: TagInfo) => Promise<void>;
+  /** Back to the branch list, dropping whatever detail was open. */
+  openBranches: () => void;
   backToBranches: () => void;
   loadMoreCommits: () => Promise<void>;
 }
@@ -42,6 +50,11 @@ export const createCommitsSlice: StateCreator<AppState, [], [], CommitsSlice> = 
     commits: [],
     commitsLoading: false,
     commitsHasMore: false,
+    commitSearchOpen: false,
+
+    setCommitSearchOpen(open) {
+      set({ commitSearchOpen: open });
+    },
 
     async openBranch(refName) {
       const project = get().activeProject;
@@ -56,6 +69,7 @@ export const createCommitsSlice: StateCreator<AppState, [], [], CommitsSlice> = 
         pane: "commits",
         selectedBranch: branch,
         selectedTag: null,
+        stashPreview: null,
         selectedCommitSha: null,
         commitFiles: [],
         filesLoading: false,
@@ -67,6 +81,7 @@ export const createCommitsSlice: StateCreator<AppState, [], [], CommitsSlice> = 
         commitsHasMore: cached?.hasMore ?? false,
         commitsLoading: !cached,
         branchFilter: "",
+        commitSearchOpen: false,
       });
 
       if (cached) return;
@@ -97,6 +112,7 @@ export const createCommitsSlice: StateCreator<AppState, [], [], CommitsSlice> = 
         pane: "commits",
         selectedBranch: null,
         selectedTag: tag,
+        stashPreview: null,
         selectedCommitSha: null,
         commitFiles: [],
         filesLoading: false,
@@ -108,6 +124,7 @@ export const createCommitsSlice: StateCreator<AppState, [], [], CommitsSlice> = 
         commitsHasMore: cached?.hasMore ?? false,
         commitsLoading: !cached,
         branchFilter: "",
+        commitSearchOpen: false,
       });
 
       if (cached) return;
@@ -122,6 +139,10 @@ export const createCommitsSlice: StateCreator<AppState, [], [], CommitsSlice> = 
         set({ commitsLoading: false });
         notify("error", errorMessage(error));
       }
+    },
+
+    openBranches() {
+      set({ ...clearDetail() });
     },
 
     backToBranches() {

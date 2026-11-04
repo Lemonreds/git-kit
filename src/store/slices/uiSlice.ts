@@ -8,10 +8,16 @@ let toastTimer: ReturnType<typeof setTimeout> | undefined;
 export interface UiSlice {
   toast: Toast | null;
   alert: AlertMessage | null;
+  /** The ⌘K command palette is open. */
+  paletteOpen: boolean;
+  /** Workflow waiting for the "run it?" confirmation (panel and palette). */
+  pendingWorkflowRun: string | null;
   notify: (kind: ToastKind, message: string) => void;
   dismissToast: () => void;
   showAlert: (title: string, message: string) => void;
   dismissAlert: () => void;
+  setPaletteOpen: (open: boolean) => void;
+  setPendingWorkflowRun: (id: string | null) => void;
 }
 
 /**
@@ -22,6 +28,16 @@ export interface UiSlice {
 export const createUiSlice: StateCreator<AppState, [], [], UiSlice> = (set) => ({
   toast: null,
   alert: null,
+  paletteOpen: false,
+  pendingWorkflowRun: null,
+
+  setPaletteOpen(open) {
+    set({ paletteOpen: open });
+  },
+
+  setPendingWorkflowRun(id) {
+    set({ pendingWorkflowRun: id });
+  },
 
   notify(kind, message) {
     if (toastTimer) clearTimeout(toastTimer);

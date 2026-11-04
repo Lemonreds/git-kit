@@ -5,7 +5,7 @@ import { api, IpcError } from "../../lib/ipc";
 import type { FileChange, FileDiff } from "../../lib/types";
 import type { AppState } from "../appStore";
 import { cacheKey, diffCache, errorMessage, feedback, filesCache, token } from "../shared";
-import type { DiffMode, WorktreeTarget } from "../types";
+import type { DiffMode, StashPreview, WorktreeTarget } from "../types";
 
 export interface DiffSlice {
   selectedCommitSha: string | null;
@@ -16,11 +16,15 @@ export interface DiffSlice {
   diffLoading: boolean;
   diffMode: DiffMode;
   worktreeTarget: WorktreeTarget | null;
+  /** Set while the detail column previews a stash instead of a commit. */
+  stashPreview: StashPreview | null;
 
   selectCommit: (sha: string) => Promise<void>;
   selectFile: (file: FileChange) => Promise<void>;
   setDiffMode: (mode: DiffMode) => void;
   openWorktreeDiff: (path: string, staged: boolean) => Promise<void>;
+  /** Show `stash@{index}` in the detail column (file list + patches). */
+  previewStash: (index: number, selector: string) => Promise<void>;
   /** Re-read the opened commit's file list from disk (drops that commit's caches). */
   refreshCommitFiles: () => Promise<void>;
   /** Re-read the opened worktree file's diff from disk. */
@@ -95,6 +99,7 @@ export const createDiffSlice: StateCreator<AppState, [], [], DiffSlice> = (set, 
     const cached = diffCache.get(key);
     set({
       worktreeTarget: { path, staged },
+      stashPreview: null,
       selectedCommitSha: null,
       commitFiles: [],
       selectedFilePath: path,
@@ -142,6 +147,7 @@ export const createDiffSlice: StateCreator<AppState, [], [], DiffSlice> = (set, 
     diffLoading: false,
     diffMode: "unified",
     worktreeTarget: null,
+    stashPreview: null,
 
     async selectCommit(sha) {
       const project = get().activeProject;
@@ -151,6 +157,7 @@ export const createDiffSlice: StateCreator<AppState, [], [], DiffSlice> = (set, 
       const epoch = token.detail;
       set({
         selectedCommitSha: sha,
+        stashPreview: null,
         filesLoading: true,
         commitFiles: [],
         selectedFilePath: null,
@@ -220,6 +227,43 @@ export const createDiffSlice: StateCreator<AppState, [], [], DiffSlice> = (set, 
 
     async openWorktreeDiff(path, staged) {
       await loadWorktreeDiff(path, staged, true);
+    },
+
+    async previewStash(index, selector) {
+      const project = get().activeProject;
+      if (!project) return;
+      const already = get().stashPreview;
+      if (already?.selector === selector && get().commitFiles.length > 0) {
+        set({ stashPreview: { index, selector } });
+        return;
+      }
+
+      const epoch = token.detail;
+      set({
+        selectedCommitSha: selector,
+        stashPreview: { index, selector },
+        worktreeTarget: null,
+        filesLoading: true,
+        commitFiles: [],
+        selectedFilePath: null,
+        diff: null,
+        diffLoading: false,
+      });
+
+      // Keyed apart from commits: the same rev string must not collide with a
+      // real commit list, and popping the stash invalidates it wholesale.
+      const key = cacheKey("stash", project.id, selector);
+      try {
+        const files = filesCache.get(key) ?? (await api.getCommitFiles(project.path, selector));
+        filesCache.set(key, files);
+        if (epoch !== token.detail) return;
+        set({ commitFiles: files.files, filesLoading: false });
+        if (files.files.length > 0) await get().selectFile(files.files[0]);
+      } catch (error) {
+        if (epoch !== token.detail) return;
+        set({ filesLoading: false });
+        fail(t("store.loadCommitDiffFailed"), error);
+      }
     },
 
     async refreshCommitFiles() {

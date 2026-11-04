@@ -220,7 +220,7 @@ export default function TagsPanel() {
     <section className="flex h-full min-h-0 flex-col overflow-hidden bg-panel">
       <header
         data-tauri-drag-region
-        className="drag-region flex h-11 shrink-0 items-center gap-2 border-b border-line px-2.5"
+        className="drag-region flex h-11 shrink-0 items-center gap-1.5 border-b border-line px-2"
       >
         <PaneTabs active="tags" changesCount={changesCount} />
         <div className="no-drag ml-auto flex min-w-0 items-center gap-0.5">

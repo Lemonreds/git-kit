@@ -7,7 +7,9 @@ import BranchPanel from "../branches/BranchPanel";
 import ChangesPanel from "../changes/ChangesPanel";
 import CommitPanel from "../commits/CommitPanel";
 import EmptyState from "../common/EmptyState";
+import StashPanel from "../stash/StashPanel";
 import TagsPanel from "../tags/TagsPanel";
+import WorkflowPanel from "../workflow/WorkflowPanel";
 import RepoStateBanner from "./RepoStateBanner";
 import StatusBar from "./StatusBar";
 
@@ -101,6 +103,10 @@ export default function WorkspacePanel() {
           <CommitPanel />
         ) : pane === "tags" ? (
           <TagsPanel />
+        ) : pane === "stash" ? (
+          <StashPanel />
+        ) : pane === "workflows" ? (
+          <WorkflowPanel />
         ) : (
           <BranchPanel />
         )}
