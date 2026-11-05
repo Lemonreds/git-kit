@@ -21,10 +21,17 @@ interface ConflictBlockCardProps {
   onAddLine: (side: "ours" | "theirs", line: number) => void;
 }
 
+const ACTION =
+  "inline-flex items-center gap-1 rounded-md border px-1.5 py-0.5 text-[10px] font-medium transition-colors";
+
 /**
- * One `<<<<<<< … >>>>>>>` block: both sides, the ancestor (when diff3 markers
- * are present) and the editable result. Quick choices only fill the draft — the
- * file is written when the user saves, so nothing is lost by exploring options.
+ * One `<<<<<<< … >>>>>>>` block, laid out the way an editor shows it: the two
+ * sides of the conflict stay visible (current on the left, incoming on the
+ * right), the accept actions sit on top of them like a code lens, and the
+ * resolved text is editable underneath.
+ *
+ * The choices only fill the draft — the file is written when the user saves, so
+ * exploring the options never loses anything.
  */
 export default function ConflictBlockCard({
   block,
@@ -44,15 +51,14 @@ export default function ConflictBlockCard({
   const theirs = sliceLines(parsed.lines, block.theirs);
   const base = block.base ? sliceLines(parsed.lines, block.base) : [];
 
-  const action = "inline-flex items-center gap-1 rounded-md border px-1.5 py-0.5 text-[10px] font-medium transition-colors";
-
   return (
     <section
       className={`overflow-hidden rounded-xl border bg-panel ${
         resolved ? "border-positive/35" : "border-warning/40"
       }`}
     >
-      <header className="flex flex-wrap items-center gap-1.5 border-b border-line bg-canvas/50 px-2 py-1.5">
+      {/* Code lens: the three actions an editor offers above a conflict region. */}
+      <header className="flex flex-wrap items-center gap-x-1.5 gap-y-1 border-b border-line bg-canvas/50 px-2 py-1.5">
         <span className="text-[11px] font-semibold text-ink">
           {t("conflict.blockIndex", { index })}
         </span>
@@ -69,36 +75,37 @@ export default function ConflictBlockCard({
           <button
             type="button"
             onClick={() => onChoose("ours")}
-            className={`${action} border-positive/35 text-positive hover:bg-positive/10`}
+            className={`${ACTION} border-positive/40 text-positive hover:bg-positive/10`}
           >
-            {t("conflict.takeOurs")}
+            {t("conflict.takeCurrent")}
           </button>
           <button
             type="button"
             onClick={() => onChoose("theirs")}
-            className={`${action} border-negative/35 text-negative hover:bg-negative/10`}
+            className={`${ACTION} border-accent/40 text-accent hover:bg-accent/10`}
           >
-            {t("conflict.takeTheirs")}
+            {t("conflict.takeIncoming")}
           </button>
           <button
             type="button"
             onClick={() => onChoose("both")}
-            className={`${action} border-line text-ink-soft hover:bg-ink/5 hover:text-ink`}
+            className={`${ACTION} border-line text-ink-soft hover:bg-ink/5 hover:text-ink`}
           >
-            {t("conflict.takeBoth")}
+            {t("conflict.keepBoth")}
           </button>
           <button
             type="button"
             onClick={() => onChoose("bothReverse")}
-            className={`${action} border-line text-ink-soft hover:bg-ink/5 hover:text-ink`}
+            title={t("conflict.keepBothReverse")}
+            className={`${ACTION} border-line text-ink-faint hover:bg-ink/5 hover:text-ink-soft`}
           >
-            {t("conflict.takeBothReverse")}
+            {t("conflict.keepBothShort")}
           </button>
           {resolved ? (
             <button
               type="button"
               onClick={onReset}
-              className={`${action} border-line text-ink-faint hover:bg-ink/5 hover:text-ink`}
+              className={`${ACTION} border-line text-ink-faint hover:bg-ink/5 hover:text-ink`}
             >
               <RotateCcw size={9} />
               {t("conflict.resetBlock")}
@@ -109,14 +116,16 @@ export default function ConflictBlockCard({
 
       <div className="flex flex-wrap gap-2 p-2">
         <ConflictSidePanel
-          title={t("conflict.oursLabel", { label: oursLabel })}
+          title={t("conflict.currentChange")}
+          caption={oursLabel}
           tone="ours"
           lines={parsed.lines}
           range={block.ours}
           onAddLine={(line) => onAddLine("ours", line)}
         />
         <ConflictSidePanel
-          title={t("conflict.theirsLabel", { label: theirsLabel })}
+          title={t("conflict.incomingChange")}
+          caption={theirsLabel}
           tone="theirs"
           lines={parsed.lines}
           range={block.theirs}
@@ -148,6 +157,9 @@ export default function ConflictBlockCard({
           <span className="font-mono text-[9.5px] text-ink-faint">
             {t("diff.lineCount", { count: draft === undefined ? 0 : draft.split("\n").length })}
           </span>
+          <span className="ml-auto text-[9.5px] text-ink-faint">
+            {t("conflict.oursLineCount", { ours: ours.length, theirs: theirs.length })}
+          </span>
         </div>
         <textarea
           value={draft ?? ""}
@@ -159,9 +171,6 @@ export default function ConflictBlockCard({
             resolved ? "border-positive/30" : "border-line"
           }`}
         />
-        <p className="mt-1 text-[10px] text-ink-faint">
-          {t("conflict.oursLineCount", { ours: ours.length, theirs: theirs.length })}
-        </p>
       </div>
     </section>
   );

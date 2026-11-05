@@ -28,6 +28,7 @@ export default function PullDialog({ branch, switchFirst = false, onClose }: Pul
   const [error, setError] = useState<string | null>(null);
   const [conflict, setConflict] = useState<string | null>(null);
   const [allowMerge, setAllowMerge] = useState(false);
+  const [skipHooks, setSkipHooks] = useState(false);
   const [busy, setBusy] = useState<"pull" | "sync" | null>(null);
 
   const load = useCallback(async () => {
@@ -59,7 +60,7 @@ export default function PullDialog({ branch, switchFirst = false, onClose }: Pul
   const submit = async () => {
     if (busy) return;
     setBusy("pull");
-    const outcome = await pullBranch(branch.name, allowMerge, switchFirst);
+    const outcome = await pullBranch(branch.name, allowMerge, switchFirst, skipHooks);
     setBusy(null);
     if (outcome.ok) {
       onClose();
@@ -277,6 +278,30 @@ export default function PullDialog({ branch, switchFirst = false, onClose }: Pul
                 </span>
               </label>
             ) : null}
+
+            {/* A fast-forward runs no hooks, so the toggle only matters for the
+                merge commit of a diverged branch. */}
+            <label className="flex cursor-pointer items-start gap-2 rounded-lg border border-line bg-canvas/40 px-3 py-2">
+              <span
+                className={`mt-0.5 grid h-3.5 w-3.5 shrink-0 place-items-center rounded-[4px] border transition-colors ${
+                  skipHooks ? "border-accent bg-accent text-white" : "border-line-strong bg-panel"
+                }`}
+              >
+                {skipHooks ? <Check size={9} strokeWidth={3} /> : null}
+              </span>
+              <input
+                type="checkbox"
+                checked={skipHooks}
+                onChange={() => setSkipHooks((value) => !value)}
+                className="sr-only"
+              />
+              <span className="min-w-0 flex-1 text-[11px] leading-relaxed text-ink-soft">
+                {t("branches.skipHooksLabel")}
+                <span className="mt-0.5 block text-[10px] text-ink-faint">
+                  {t("branches.skipHooksHint")}
+                </span>
+              </span>
+            </label>
           </>
         ) : null}
       </div>

@@ -7,11 +7,26 @@ import { errorMessage, feedback, invalidateCaches } from "../shared";
 import type { OpOutcome, RebaseOutcome } from "../types";
 
 export interface BranchOpsSlice {
-  squashBranch: (branch: string, count: number, message: string) => Promise<boolean>;
-  cherryPick: (sourceBranch: string, targetBranch: string, shas: string[]) => Promise<boolean>;
+  squashBranch: (
+    branch: string,
+    count: number,
+    message: string,
+    noVerify?: boolean,
+  ) => Promise<boolean>;
+  cherryPick: (
+    sourceBranch: string,
+    targetBranch: string,
+    shas: string[],
+    noVerify?: boolean,
+  ) => Promise<boolean>;
   pushBranch: (branch: string, force: boolean) => Promise<OpOutcome>;
   /** `switchFirst` = checkout the branch before pulling (row action on a non-current branch). */
-  pullBranch: (branch: string, allowMerge: boolean, switchFirst?: boolean) => Promise<OpOutcome>;
+  pullBranch: (
+    branch: string,
+    allowMerge: boolean,
+    switchFirst?: boolean,
+    noVerify?: boolean,
+  ) => Promise<OpOutcome>;
   /** Resolves with the rebase result when it succeeded, otherwise the error code/message. */
   rebaseBranch: (branch: string, baseRef: string) => Promise<RebaseOutcome>;
   syncBranch: (branch: string) => Promise<boolean>;
@@ -27,11 +42,11 @@ export const createBranchOpsSlice: StateCreator<AppState, [], [], BranchOpsSlice
   const { notify, fail } = feedback(get);
 
   return {
-    async squashBranch(branch, count, message) {
+    async squashBranch(branch, count, message, noVerify = false) {
       const project = get().activeProject;
       if (!project) return false;
       try {
-        const result = await api.squashCommits(project.path, branch, count, message);
+        const result = await api.squashCommits(project.path, branch, count, message, noVerify);
         invalidateCaches();
         await get().refreshBranches();
         await get().refreshChanges();
@@ -49,11 +64,17 @@ export const createBranchOpsSlice: StateCreator<AppState, [], [], BranchOpsSlice
       }
     },
 
-    async cherryPick(sourceBranch, targetBranch, shas) {
+    async cherryPick(sourceBranch, targetBranch, shas, noVerify = false) {
       const project = get().activeProject;
       if (!project) return false;
       try {
-        const result = await api.cherryPick(project.path, sourceBranch, targetBranch, shas);
+        const result = await api.cherryPick(
+          project.path,
+          sourceBranch,
+          targetBranch,
+          shas,
+          noVerify,
+        );
         invalidateCaches();
         await get().refreshBranches();
         await get().refreshChanges();
@@ -97,11 +118,17 @@ export const createBranchOpsSlice: StateCreator<AppState, [], [], BranchOpsSlice
       }
     },
 
-    async pullBranch(branch, allowMerge, switchFirst = false) {
+    async pullBranch(branch, allowMerge, switchFirst = false, noVerify = false) {
       const project = get().activeProject;
       if (!project) return { ok: false };
       try {
-        const result = await api.pullBranch(project.path, branch, allowMerge, switchFirst);
+        const result = await api.pullBranch(
+          project.path,
+          branch,
+          allowMerge,
+          switchFirst,
+          noVerify,
+        );
         invalidateCaches();
         set({ worktreeTarget: null, diff: null, selectedFilePath: null });
         await get().refreshChanges();

@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { ArrowUpDown, Check, FolderGit2, Loader2, Plus } from "lucide-react";
+import { ArrowUpDown, Check, CloudDownload, FolderGit2, Loader2, Plus } from "lucide-react";
 
 import { useT } from "../../i18n";
 import { formatBinding } from "../../lib/keymap";
@@ -10,6 +10,7 @@ import { useAppStore } from "../../store/appStore";
 import { useSlice } from "../../store/hooks";
 import ConfirmDialog from "../common/ConfirmDialog";
 import IconButton from "../common/IconButton";
+import CloneRepoDialog from "./CloneRepoDialog";
 import ProjectRow from "./ProjectRow";
 import SidebarFooter from "./SidebarFooter";
 
@@ -17,12 +18,13 @@ const SORT_OPTIONS: ProjectSort[] = ["recent", "name", "added"];
 
 export default function ProjectSidebar() {
   const t = useT();
-  const { projects, projectSort, activeId, liveTerminalIds, adding, relinkingId } = useSlice(
+  const { projects, projectSort, activeId, liveTerminalIds, adding, relinkingId, cloning } = useSlice(
     (state) => ({
       projects: state.projects,
       projectSort: state.projectSort,
       activeId: state.activeProject?.id ?? null,
       adding: state.addingProject,
+      cloning: state.cloningProject,
       relinkingId: state.relinkingId,
       // Joined into a primitive so this selector stays referentially stable: an
       // array would make `useShallow` re-render the sidebar on every store write.
@@ -44,6 +46,7 @@ export default function ProjectSidebar() {
 
   const [pendingRemoval, setPendingRemoval] = useState<Project | null>(null);
   const [sortOpen, setSortOpen] = useState(false);
+  const [cloneOpen, setCloneOpen] = useState(false);
 
   const { pinned, rest } = useMemo(() => groupProjects(projects, projectSort), [projects, projectSort]);
 
@@ -95,6 +98,20 @@ export default function ProjectSidebar() {
             onClick={() => setSortOpen((open) => !open)}
           >
             <ArrowUpDown size={14} />
+          </IconButton>
+          <IconButton
+            label={t("projects.cloneRepo")}
+            // A clone takes as long as the network does: the icon spins while the
+            // dialog stays open, so the click never looks ignored.
+            active={cloneOpen}
+            aria-busy={cloning}
+            onClick={() => setCloneOpen(true)}
+          >
+            {cloning ? (
+              <Loader2 size={14} className="animate-spin" />
+            ) : (
+              <CloudDownload size={14} />
+            )}
           </IconButton>
           <IconButton
             label={t("projects.addProject")}
@@ -196,6 +213,8 @@ export default function ProjectSidebar() {
       </div>
 
       <SidebarFooter />
+
+      {cloneOpen ? <CloneRepoDialog onClose={() => setCloneOpen(false)} /> : null}
 
       <ConfirmDialog
         open={pendingRemoval !== null}

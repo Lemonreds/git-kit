@@ -1,7 +1,7 @@
 import type { StateCreator } from "zustand";
 
 import { t } from "../../i18n";
-import { disposeTerminal } from "../../lib/terminal";
+import { disposeTerminal, shutdownTerminal as shutdownTerminalProcess } from "../../lib/terminal";
 import type { AppState } from "../appStore";
 import { feedback } from "../shared";
 
@@ -30,6 +30,11 @@ export interface TerminalSlice {
 
   openTerminal: (projectId: string) => void;
   closeTerminal: (id: string) => void;
+  /**
+   * Kill the shell process but keep the tab (and its scroll buffer) in place.
+   * The tab moves to "exited"; `openTerminal` replaces it on the next open.
+   */
+  shutdownTerminal: (id: string) => void;
   activateTerminal: (id: string) => void;
   toggleTerminalPanel: () => void;
   setTerminalOpen: (open: boolean) => void;
@@ -138,6 +143,16 @@ export const createTerminalSlice: StateCreator<AppState, [], [], TerminalSlice> 
           terminalOpen: terminals.length > 0 && state.terminalOpen,
         };
       });
+    },
+
+    shutdownTerminal(id) {
+      const tab = get().terminals.find((item) => item.id === id);
+      if (!tab || tab.status !== "live") return;
+      // No live pty (still opening, or already gone): nothing to shut down.
+      if (!shutdownTerminalProcess(id)) return;
+      // The real exit code arrives with the exit frame right after; this keeps
+      // the badge honest if that frame never lands.
+      get().markTerminalExit(id, null);
     },
 
     activateTerminal(id) {

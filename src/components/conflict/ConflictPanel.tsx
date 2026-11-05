@@ -235,7 +235,7 @@ export default function ConflictPanel() {
                   <button
                     type="button"
                     onClick={() => applyAll("theirs")}
-                    className="rounded-md border border-negative/35 px-1.5 py-0.5 text-[10px] font-medium text-negative transition-colors hover:bg-negative/10"
+                    className="rounded-md border border-accent/35 px-1.5 py-0.5 text-[10px] font-medium text-accent transition-colors hover:bg-accent/10"
                   >
                     {t("conflict.allTheirs")}
                   </button>
@@ -326,7 +326,7 @@ export default function ConflictPanel() {
                   type="button"
                   onClick={() => void resolveSide("theirs")}
                   disabled={saving}
-                  className="rounded-lg border border-negative/40 px-2 py-1 text-[11px] font-medium text-negative transition-colors hover:bg-negative/10 disabled:opacity-50"
+                  className="rounded-lg border border-accent/40 px-2 py-1 text-[11px] font-medium text-accent transition-colors hover:bg-accent/10 disabled:opacity-50"
                 >
                   {t("conflict.takeTheirsFile")}
                 </button>

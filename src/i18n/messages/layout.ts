@@ -35,6 +35,9 @@ export const zh = {
   "workspace.continue": "继续",
   "workspace.skip": "跳过",
   "workspace.abort": "中止",
+  "workspace.skipHooks": "跳过钩子（-n）",
+  "workspace.skipHooksHint":
+    "继续时加 --no-verify，跳过 git 钩子（revert / cherry-pick 通过关闭 hooksPath 实现）。",
 
   "workspace.branchTip": "当前分支：{branch}",
   "workspace.noBranch": "无分支",
@@ -81,6 +84,9 @@ export const en: Record<keyof typeof zh, Message> = {
   "workspace.continue": "Continue",
   "workspace.skip": "Skip",
   "workspace.abort": "Abort",
+  "workspace.skipHooks": "Skip hooks (-n)",
+  "workspace.skipHooksHint":
+    "Adds --no-verify when continuing, skipping git hooks (revert / cherry-pick bypass hooksPath instead).",
 
   "workspace.branchTip": "Current branch: {branch}",
   "workspace.noBranch": "No branch",

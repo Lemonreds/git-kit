@@ -95,7 +95,9 @@ fn validate_remote_name(repo: &Repository, name: &str) -> Result<(), AppError> {
     Ok(())
 }
 
-fn validate_remote_url(url: &str) -> Result<(), AppError> {
+/// Shared with `git::clone`: the same rules apply to a repository that is being
+/// cloned as to one that is being added as a remote address.
+pub(crate) fn validate_remote_url(url: &str) -> Result<(), AppError> {
     if url.is_empty() {
         return Err(AppError::RemoteInvalid("远程地址不能为空".to_string()));
     }

@@ -1,5 +1,6 @@
 pub mod branches;
 pub mod cli;
+pub mod clone;
 pub mod commits;
 pub mod config;
 pub mod conflict;

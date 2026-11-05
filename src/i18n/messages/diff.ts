@@ -41,6 +41,9 @@ export const zh = {
     "会生成一个反向提交（git revert），不会改写历史，适合已推送的提交。",
   "diff.revertConfirm": "撤销提交",
   "diff.revertFailed": "撤销提交失败",
+  "diff.revertSkipHooks": "跳过提交前置检查（-n）",
+  "diff.revertSkipHooksHint":
+    "加 --no-verify，跳过 pre-commit / commit-msg 钩子。默认不跳过。",
   "diff.binaryTitle": "二进制文件",
   "diff.binaryDescription": "该文件无法按行展示差异，请在本地工具中查看。",
   "diff.binaryBadge": "二进制",
@@ -100,6 +103,9 @@ export const en: Record<keyof typeof zh, Message> = {
     "This creates a reverse commit (git revert) without rewriting history, which is safe for commits that were already pushed.",
   "diff.revertConfirm": "Revert commit",
   "diff.revertFailed": "Revert failed",
+  "diff.revertSkipHooks": "Skip commit hooks (-n)",
+  "diff.revertSkipHooksHint":
+    "Adds --no-verify, skipping the pre-commit / commit-msg hooks. Off by default.",
   "diff.binaryTitle": "Binary file",
   "diff.binaryDescription":
     "This file cannot be shown as a line diff. Open it in a local tool instead.",

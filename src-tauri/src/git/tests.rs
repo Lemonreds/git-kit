@@ -6,7 +6,8 @@ use git2::{Oid, Repository};
 use tempfile::TempDir;
 
 use crate::git::{
-    branches, commits, conflict, diff, history, hooks, ops, repo as git_repo, status, workflow,
+    branches, clone as git_clone, commits, conflict, diff, history, hooks, ops, repo as git_repo,
+    status, workflow,
 };
 use crate::model::{ConflictKind, FileStatus};
 
@@ -430,7 +431,7 @@ fn squash_rejects_folding_every_commit() {
     stage_file(&repo, "a.txt", "a\n");
     commit(&repo, "a");
 
-    let error = ops::squash_commits(dir.path(), "main", 1, "one")
+    let error = ops::squash_commits(dir.path(), "main", 1, "one", false)
         .expect_err("a single commit cannot be squashed");
     assert!(error.to_string().contains("最多可压缩 0 个"), "{error}");
 
@@ -439,14 +440,152 @@ fn squash_rejects_folding_every_commit() {
     stage_file(&repo, "c.txt", "c\n");
     commit(&repo, "c");
 
-    let error = ops::squash_commits(dir.path(), "main", 3, "all three")
+    let error = ops::squash_commits(dir.path(), "main", 3, "all three", false)
         .expect_err("the oldest commit must survive");
     assert!(error.to_string().contains("最多可压缩 2 个"), "{error}");
 
-    let result = ops::squash_commits(dir.path(), "main", 2, "b + c").expect("squash two");
+    let result = ops::squash_commits(dir.path(), "main", 2, "b + c", false).expect("squash two");
     assert_eq!(result.squashed, 2);
     let log = ops::squash_preview(&repo, "main").expect("preview");
     assert_eq!(log.total_commits, 2, "3 commits folded into a + one");
+}
+
+// ---------------------------------------------------------------------------
+// Skipping hooks (-n)
+// ---------------------------------------------------------------------------
+
+/// A `pre-commit` / `commit-msg` hook that always refuses, installed exactly the
+/// way git requires: a script with the executable bit.
+fn install_failing_hook(dir: &Path, name: &str) {
+    let hooks = dir.join(".git").join("hooks");
+    fs::create_dir_all(&hooks).expect("hooks dir");
+    let path = hooks.join(name);
+    fs::write(&path, "#!/bin/sh\necho 'hook refused' >&2\nexit 1\n").expect("write hook");
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let mut mode = fs::metadata(&path).expect("stat hook").permissions();
+        mode.set_mode(0o755);
+        fs::set_permissions(&path, mode).expect("chmod hook");
+    }
+}
+
+/// `-n` is opt-in: the hook has to block the commit by default, and only the
+/// explicit skip lets it through.
+#[test]
+fn commit_staged_skips_hooks_only_when_asked() {
+    let (dir, repo) = workspace();
+    install_failing_hook(dir.path(), "pre-commit");
+    stage_file(&repo, "next.txt", "next\n");
+
+    let error = ops::commit_staged(dir.path(), "feat: next", false)
+        .expect_err("the hook must block the commit");
+    assert!(error.to_string().contains("hook refused"), "{error}");
+
+    let result = ops::commit_staged(dir.path(), "feat: next", true).expect("skip the hook");
+    assert_eq!(result.message, "feat: next");
+}
+
+/// A failing squash leaves its work staged (the `reset --soft` already ran), so
+/// the dialog can retry: that retry is what `-n` has to make possible.
+#[test]
+fn squash_reports_a_failing_hook_and_leaves_the_squash_staged() {
+    let (dir, repo) = workspace_on("main");
+    stage_file(&repo, "a.txt", "a\n");
+    commit(&repo, "a");
+    stage_file(&repo, "b.txt", "b\n");
+    commit(&repo, "b");
+    stage_file(&repo, "c.txt", "c\n");
+    commit(&repo, "c");
+    install_failing_hook(dir.path(), "pre-commit");
+
+    let error = ops::squash_commits(dir.path(), "main", 2, "b + c", false)
+        .expect_err("the hook must block the squash commit");
+    assert!(error.to_string().contains("已执行 reset --soft"), "{error}");
+
+    // The two commits still sit in the index, so a normal commit finishes it.
+    let result = ops::commit_staged(dir.path(), "b + c", true).expect("skip the hook");
+    assert_eq!(result.message, "b + c");
+}
+
+/// The squash dialog's checkbox passes straight through to `git commit -n`.
+#[test]
+fn squash_can_skip_hooks_with_no_verify() {
+    let (dir, repo) = workspace_on("main");
+    stage_file(&repo, "a.txt", "a\n");
+    commit(&repo, "a");
+    stage_file(&repo, "b.txt", "b\n");
+    commit(&repo, "b");
+    stage_file(&repo, "c.txt", "c\n");
+    commit(&repo, "c");
+    install_failing_hook(dir.path(), "pre-commit");
+
+    let result = ops::squash_commits(dir.path(), "main", 2, "b + c", true).expect("skip the hook");
+    assert_eq!(result.squashed, 2);
+}
+
+/// `git commit --amend` must honour the same toggle: a `commit-msg` hook that
+/// refuses the message would otherwise make amending impossible in the app.
+#[test]
+fn amend_can_skip_hooks_with_no_verify() {
+    let (dir, _repo) = workspace();
+    install_failing_hook(dir.path(), "commit-msg");
+
+    let error = workflow::amend_commit(dir.path(), "chore: init v2", false)
+        .expect_err("the hook must block the amend");
+    assert!(error.to_string().contains("hook refused"), "{error}");
+
+    let result = workflow::amend_commit(dir.path(), "chore: init v2", true).expect("skip the hook");
+    assert_eq!(result.message, "chore: init v2");
+}
+
+/// Two branches that both moved: the merge needs a merge commit, which is the
+/// only thing a merge hook can stop.
+fn diverged_workspace() -> (TempDir, Repository) {
+    let (dir, repo) = workspace_on("main");
+    stage_file(&repo, "base.txt", "base\n");
+    commit(&repo, "base");
+
+    git_ok(dir.path(), &["checkout", "-b", "side"]);
+    let repo = Repository::open(dir.path()).expect("reopen");
+    stage_file(&repo, "side.txt", "side\n");
+    commit(&repo, "feat: side");
+
+    git_ok(dir.path(), &["checkout", "main"]);
+    let repo = Repository::open(dir.path()).expect("reopen");
+    stage_file(&repo, "mine.txt", "mine\n");
+    commit(&repo, "feat: mine");
+    (dir, repo)
+}
+
+#[test]
+fn merge_can_skip_hooks_with_no_verify() {
+    let (dir, _repo) = diverged_workspace();
+    install_failing_hook(dir.path(), "pre-merge-commit");
+
+    let result = workflow::merge_branch(dir.path(), "side", false, true).expect("skip the hook");
+    assert_eq!(result.source, "side");
+
+    // Without the skip the same hook would have stopped the merge commit.
+    let (blocked_dir, _blocked) = diverged_workspace();
+    install_failing_hook(blocked_dir.path(), "pre-merge-commit");
+    let error = workflow::merge_branch(blocked_dir.path(), "side", false, false)
+        .expect_err("the hook must block the merge commit");
+    assert!(error.to_string().contains("合并 side 失败"), "{error}");
+}
+
+/// A hook failure leaves the repository mid-merge; continuing with `-n` is how
+/// the banner's Continue button finishes it.
+#[test]
+fn merge_continue_can_skip_hooks_with_no_verify() {
+    let (dir, _repo) = diverged_workspace();
+    install_failing_hook(dir.path(), "pre-merge-commit");
+    let _ = workflow::merge_branch(dir.path(), "side", false, false)
+        .expect_err("the hook must block the merge commit");
+
+    let state = workflow::operation_action(dir.path(), "continue", true)
+        .expect("continue must be able to skip the hook");
+    assert_eq!(state.kind, "none", "the merge is concluded");
 }
 
 // ---------------------------------------------------------------------------
@@ -838,4 +977,82 @@ fn hooks_round_trip_enable_and_delete() {
     let pre = gone.iter().find(|hook| hook.name == "pre-commit").expect("listed");
     assert!(!pre.present);
     assert!(pre.has_sample, "the .sample template must survive a delete");
+}
+
+// ---------------------------------------------------------------------------
+// clone
+// ---------------------------------------------------------------------------
+
+#[test]
+fn clone_name_is_derived_from_the_common_url_shapes() {
+    assert_eq!(
+        git_clone::repo_name_from_url("https://github.com/owner/repo.git"),
+        "repo"
+    );
+    assert_eq!(
+        git_clone::repo_name_from_url("  git@github.com:owner/repo.git  "),
+        "repo"
+    );
+    assert_eq!(
+        git_clone::repo_name_from_url("ssh://git@host:22/owner/repo/"),
+        "repo"
+    );
+    // Windows local paths use backslashes as the separator.
+    assert_eq!(git_clone::repo_name_from_url(r"C:\repos\mine"), "mine");
+    // Nothing usable to derive: the UI has to ask for a name.
+    assert_eq!(git_clone::repo_name_from_url(""), "");
+}
+
+#[test]
+fn clone_copies_history_into_a_new_folder() {
+    let (source, _repo) = workspace();
+    let parent = tempfile::tempdir().expect("tempdir");
+    // A local path is a valid git URL: this exercises the real `git clone`
+    // without touching the network.
+    let url = source.path().display().to_string();
+
+    let target = git_clone::clone_repo(parent.path(), &url, "copy").expect("clone");
+    assert_eq!(target, std::fs::canonicalize(parent.path()).unwrap().join("copy"));
+    assert_eq!(
+        fs::read_to_string(target.join("README.md")).expect("readme"),
+        "hello\n"
+    );
+    assert!(git_repo::open_repo(&target.display().to_string()).is_ok());
+}
+
+#[test]
+fn clone_refuses_names_that_escape_the_parent_and_busy_targets() {
+    let (source, _repo) = workspace();
+    let parent = tempfile::tempdir().expect("tempdir");
+    let url = source.path().display().to_string();
+
+    // A name is one path segment, never a path.
+    assert!(git_clone::clone_repo(parent.path(), &url, "../escape").is_err());
+    assert!(git_clone::clone_repo(parent.path(), &url, "nested/dir").is_err());
+    assert!(git_clone::clone_repo(parent.path(), &url, "..").is_err());
+    assert!(git_clone::clone_repo(parent.path(), &url, "   ").is_err());
+
+    let busy = parent.path().join("busy");
+    fs::create_dir(&busy).expect("mkdir");
+    fs::write(busy.join("keep.txt"), "keep\n").expect("write");
+    let error = git_clone::clone_repo(parent.path(), &url, "busy").expect_err("busy target");
+    assert!(error.to_string().contains("已存在"));
+
+    // An existing but empty folder is fine (git accepts it too).
+    fs::create_dir(parent.path().join("empty")).expect("mkdir empty");
+    assert!(git_clone::clone_repo(parent.path(), &url, "empty").is_ok());
+}
+
+#[test]
+fn clone_reports_git_failures_with_their_detail() {
+    let parent = tempfile::tempdir().expect("tempdir");
+    let missing = parent.path().join("does-not-exist");
+    let error = git_clone::clone_repo(parent.path(), &missing.display().to_string(), "copy")
+        .expect_err("missing source must fail");
+    let message = error.to_string();
+    assert!(message.contains("克隆失败"), "unexpected error: {message}");
+    assert!(
+        !parent.path().join("copy").exists(),
+        "a failed clone must not leave a folder behind"
+    );
 }

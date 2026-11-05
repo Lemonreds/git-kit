@@ -32,15 +32,18 @@ export interface WorkflowSlice {
   reflog: ReflogEntry[];
 
   refreshRepoState: () => Promise<void>;
-  repoOperation: (action: "continue" | "skip" | "abort") => Promise<boolean>;
+  repoOperation: (action: "continue" | "skip" | "abort", noVerify?: boolean) => Promise<boolean>;
   refreshStashes: () => Promise<void>;
   stashPush: (message: string, includeUntracked: boolean) => Promise<boolean>;
   stashPop: (index: number) => Promise<OpOutcome>;
   stashDrop: (index: number) => Promise<boolean>;
-  amendCommit: (message: string) => Promise<OpOutcome & { needsForcePush?: boolean }>;
+  amendCommit: (
+    message: string,
+    noVerify?: boolean,
+  ) => Promise<OpOutcome & { needsForcePush?: boolean }>;
   ignorePath: (path: string, isDir: boolean) => Promise<boolean>;
-  mergeBranch: (source: string, noFf: boolean) => Promise<OpOutcome>;
-  revertCommit: (sha: string) => Promise<OpOutcome>;
+  mergeBranch: (source: string, noFf: boolean, noVerify?: boolean) => Promise<OpOutcome>;
+  revertCommit: (sha: string, noVerify?: boolean) => Promise<OpOutcome>;
   /** Open the tags pane of the middle column; `newTagTarget` pre-fills the form. */
   openTags: (newTagTarget?: string | null) => void;
   /** Open the stash pane of the middle column. */
@@ -108,11 +111,11 @@ export const createWorkflowSlice: StateCreator<AppState, [], [], WorkflowSlice> 
       }
     },
 
-    async repoOperation(action) {
+    async repoOperation(action, noVerify = false) {
       const project = get().activeProject;
       if (!project) return false;
       try {
-        const state = await api.repoOperation(project.path, action);
+        const state = await api.repoOperation(project.path, action, noVerify);
         set({ repoState: state });
         invalidateCaches();
         await get().refreshBranches();
@@ -213,11 +216,11 @@ export const createWorkflowSlice: StateCreator<AppState, [], [], WorkflowSlice> 
       }
     },
 
-    async amendCommit(message) {
+    async amendCommit(message, noVerify = false) {
       const project = get().activeProject;
       if (!project) return { ok: false };
       try {
-        const result = await api.amendCommit(project.path, message);
+        const result = await api.amendCommit(project.path, message, noVerify);
         invalidateCaches();
         set({ selectedCommitSha: null, commitFiles: [], diff: null });
         await get().refreshChanges();
@@ -246,11 +249,11 @@ export const createWorkflowSlice: StateCreator<AppState, [], [], WorkflowSlice> 
       }
     },
 
-    async mergeBranch(source, noFf) {
+    async mergeBranch(source, noFf, noVerify = false) {
       const project = get().activeProject;
       if (!project) return { ok: false };
       try {
-        const result = await api.mergeBranch(project.path, source, noFf);
+        const result = await api.mergeBranch(project.path, source, noFf, noVerify);
         invalidateCaches();
         set({ worktreeTarget: null, diff: null });
         await get().refreshChanges();
@@ -275,11 +278,11 @@ export const createWorkflowSlice: StateCreator<AppState, [], [], WorkflowSlice> 
       }
     },
 
-    async revertCommit(sha) {
+    async revertCommit(sha, noVerify = false) {
       const project = get().activeProject;
       if (!project) return { ok: false };
       try {
-        const result = await api.revertCommit(project.path, sha);
+        const result = await api.revertCommit(project.path, sha, noVerify);
         invalidateCaches();
         await get().refreshChanges();
         await get().refreshBranches();

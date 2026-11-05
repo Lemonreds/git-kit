@@ -25,6 +25,8 @@ export interface ProjectSlice {
   activeProject: Project | null;
   /** A native folder sheet is open for the "add project" action. */
   addingProject: boolean;
+  /** A `git clone` is running: the sidebar spinner and the dialog both use it. */
+  cloningProject: boolean;
   /** A native folder sheet is open to relink this project. */
   relinkingId: string | null;
 
@@ -32,6 +34,11 @@ export interface ProjectSlice {
   loadProject: (project: Project) => Promise<void>;
   selectProject: (id: string) => Promise<void>;
   addProject: () => Promise<void>;
+  /**
+   * Clone a remote repository into `parentDir/name` and add it to the sidebar.
+   * Resolves to true when the folder was cloned and registered.
+   */
+  cloneRepo: (args: { parentDir: string; url: string; name: string }) => Promise<boolean>;
   relinkProject: (id: string) => Promise<void>;
   removeProject: (id: string) => Promise<void>;
   pinProject: (id: string, pinned: boolean) => Promise<void>;
@@ -85,6 +92,7 @@ export const createProjectSlice: StateCreator<AppState, [], [], ProjectSlice> = 
     projectSort: (localStorage.getItem("gk.projectSort") as ProjectSort | null) ?? "recent",
     activeProject: null,
     addingProject: false,
+    cloningProject: false,
     relinkingId: null,
     refreshing: false,
 
@@ -207,6 +215,41 @@ export const createProjectSlice: StateCreator<AppState, [], [], ProjectSlice> = 
         notify("success", t("store.projectAdded", { name: project.name }));
       } catch (error) {
         fail(t("store.addProjectFailed"), error);
+      }
+    },
+
+    async cloneRepo({ parentDir, url, name }) {
+      const remote = url.trim();
+      const folder = name.trim();
+      if (!remote) {
+        notify("error", t("store.cloneMissingUrl"));
+        return false;
+      }
+      if (!parentDir) {
+        notify("error", t("store.cloneMissingDir"));
+        return false;
+      }
+      if (!folder) {
+        notify("error", t("store.cloneMissingName"));
+        return false;
+      }
+
+      set({ cloningProject: true });
+      try {
+        const project = await api.cloneRepo(parentDir, remote, folder);
+        set((state) => ({ projects: upsertProject(state.projects, project) }));
+        // Deliberately no switch: the new clone shows up in the sidebar and the
+        // toast confirms it, while whatever the user had open stays open. An
+        // empty sidebar is the exception — there is nothing to keep.
+        if (!get().activeProject) await get().loadProject(project);
+        notify("success", t("store.cloneSuccess", { name: project.name }));
+        return true;
+      } catch (error) {
+        // Long git output (fatal: …) becomes the blocking alert dialog.
+        fail(t("store.cloneFailed"), error);
+        return false;
+      } finally {
+        set({ cloningProject: false });
       }
     },
 

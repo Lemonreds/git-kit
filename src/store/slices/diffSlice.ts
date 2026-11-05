@@ -226,6 +226,13 @@ export const createDiffSlice: StateCreator<AppState, [], [], DiffSlice> = (set, 
     },
 
     async openWorktreeDiff(path, staged) {
+      const project = get().activeProject;
+      if (!project) return;
+      // Always hit the disk. Editors, formatters and CLI tools keep rewriting the
+      // worktree while the app is open, so a cached patch is exactly the stale
+      // view the user would be staring at. Clicking a file is a deliberate
+      // "show me what is on disk now", not a re-render of an old answer.
+      diffCache.delete(cacheKey("wt", project.id, path, String(staged)));
       await loadWorktreeDiff(path, staged, true);
     },
 

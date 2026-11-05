@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import {
   AlertTriangle,
   Archive,
+  Check,
   ClipboardCopy,
   Columns2,
   Copy,
@@ -124,6 +125,8 @@ export default function DiffPanel() {
   const [detailOpen, setDetailOpen] = useState(false);
   const [detail, setDetail] = useState<CommitDetail | null>(null);
   const [confirmRevert, setConfirmRevert] = useState(false);
+  // `git revert` has no `--no-verify`: the backend skips hooks another way.
+  const [revertSkipHooks, setRevertSkipHooks] = useState(false);
 
   useEffect(() => {
     // A stash ref is not a commit: `get_commit` would just 404 on it.
@@ -605,14 +608,36 @@ export default function DiffPanel() {
         onConfirm={() => {
           setConfirmRevert(false);
           if (!selectedCommitSha) return;
-          void revertCommit(selectedCommitSha).then((outcome) => {
+          void revertCommit(selectedCommitSha, revertSkipHooks).then((outcome) => {
             if (!outcome.ok && outcome.message) {
               showAlert(t("diff.revertFailed"), outcome.message);
             }
           });
         }}
         onCancel={() => setConfirmRevert(false)}
-      />
+      >
+        <label className="mt-3 flex cursor-pointer items-start gap-2 rounded-lg border border-line bg-canvas/40 px-2.5 py-1.5">
+          <span
+            className={`mt-0.5 grid h-3.5 w-3.5 shrink-0 place-items-center rounded-[4px] border transition-colors ${
+              revertSkipHooks ? "border-accent bg-accent text-white" : "border-line-strong bg-panel"
+            }`}
+          >
+            {revertSkipHooks ? <Check size={9} strokeWidth={3} /> : null}
+          </span>
+          <input
+            type="checkbox"
+            checked={revertSkipHooks}
+            onChange={() => setRevertSkipHooks((value) => !value)}
+            className="sr-only"
+          />
+          <span className="min-w-0 flex-1 text-[11px] leading-relaxed text-ink-soft">
+            {t("diff.revertSkipHooks")}
+            <span className="mt-0.5 block text-[10px] text-ink-faint">
+              {t("diff.revertSkipHooksHint")}
+            </span>
+          </span>
+        </label>
+      </ConfirmDialog>
     </section>
   );
 }

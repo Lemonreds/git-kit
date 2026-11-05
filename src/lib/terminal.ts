@@ -392,6 +392,28 @@ export function writeTerminal(key: string, data: string): void {
 }
 
 /**
+ * Kill the shell behind a session but keep its xterm (and scroll buffer) alive.
+ *
+ * The difference from `disposeTerminal`: closing a tab throws the buffer away,
+ * while shutting down only ends the process — the tab flips to "exited" through
+ * the normal exit frame and `+` can open a fresh shell for the same project.
+ * `terminal_close` already kills the child and drops the pty master, which also
+ * hangs up whatever foreground process was running in it.
+ *
+ * Returns false when there is no live pty (already exited or still opening).
+ */
+export function shutdownTerminal(key: string): boolean {
+  const attachment = attachments.get(key);
+  const rustId = attachment?.rustId;
+  if (!attachment || !rustId) return false;
+  // Cleared first: writes and pause/resume must not chase a pty that is going
+  // away, and the frame from Rust lands a moment later anyway.
+  attachment.rustId = null;
+  void api.terminalClose(rustId).catch(() => undefined);
+  return true;
+}
+
+/**
  * Tear the session down for good. Called from the store (tab close, LRU eviction,
  * project removed) and *not* from a React effect cleanup — StrictMode's fake
  * unmount would otherwise kill a perfectly healthy shell.
