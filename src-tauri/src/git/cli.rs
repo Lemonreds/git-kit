@@ -12,6 +12,11 @@ use crate::error::AppError;
 /// command never hangs forever on a credential helper.
 pub const NETWORK_TIMEOUT: Duration = Duration::from_secs(120);
 
+/// A fresh clone downloads a whole history, so it gets a far longer ceiling than
+/// a push / fetch: minutes on a large repository or a slow SSH handshake must not
+/// be answered with "operation timed out".
+pub const CLONE_TIMEOUT: Duration = Duration::from_secs(15 * 60);
+
 #[derive(Debug, Clone, Default)]
 pub struct GitOutput {
     pub stdout: String,
@@ -102,9 +107,10 @@ pub fn run(repo: &Path, args: &[&str], timeout: Option<Duration>) -> Result<GitO
                 let _ = child.wait();
                 let _ = stdout_reader.join();
                 let _ = stderr_reader.join();
-                return Err(AppError::CommandFailed(
-                    "操作超时（120 秒），请检查网络、代理或凭据配置后重试".to_string(),
-                ));
+                return Err(AppError::CommandFailed(format!(
+                    "操作超时（{} 秒），请检查网络、代理或凭据配置后重试",
+                    limit.as_secs()
+                )));
             }
         }
         std::thread::sleep(Duration::from_millis(40));
@@ -129,6 +135,32 @@ pub fn run(repo: &Path, args: &[&str], timeout: Option<Duration>) -> Result<GitO
 
 pub fn run_blocking(repo: &Path, args: &[&str]) -> Result<GitOutput, AppError> {
     run(repo, args, None)
+}
+
+/// `core.hooksPath` that can never hold a hook script: git looks for
+/// `<hooksPath>/pre-commit`, finds nothing, and runs no hook at all.
+///
+/// `--no-verify` only exists on `commit` and `merge`; `revert`, `cherry-pick`
+/// and `--continue` have no such flag, so pointing the hooks path elsewhere is
+/// the only way to give them the same "skip hooks" promise (`-n`).
+#[cfg(target_os = "windows")]
+const HOOKS_DISABLED: &str = "core.hooksPath=NUL";
+#[cfg(not(target_os = "windows"))]
+const HOOKS_DISABLED: &str = "core.hooksPath=/dev/null";
+
+/// Git-level config args that disable every hook for one invocation.
+pub fn hooks_bypass() -> [&'static str; 2] {
+    ["-c", HOOKS_DISABLED]
+}
+
+/// Prefix `args` with the hook bypass when the user asked to skip hooks.
+pub fn with_hook_bypass<'a>(args: Vec<&'a str>, no_verify: bool) -> Vec<&'a str> {
+    if !no_verify {
+        return args;
+    }
+    let mut out: Vec<&'a str> = hooks_bypass().to_vec();
+    out.extend(args);
+    out
 }
 
 /// Branch names are passed to git as arguments, so refuse anything that could

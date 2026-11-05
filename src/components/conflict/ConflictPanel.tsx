@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import {
   AlertTriangle,
   ChevronLeft,
@@ -13,7 +13,6 @@ import {
 
 import type { MessageKey } from "../../i18n";
 import { useT } from "../../i18n";
-import type { ConflictBlock, ParsedConflictFile } from "../../lib/parseConflicts";
 import type { ConflictKind } from "../../lib/types";
 import { useAppStore } from "../../store/appStore";
 import { useSlice } from "../../store/hooks";
@@ -23,7 +22,7 @@ import IconButton from "../common/IconButton";
 import { SkeletonRows } from "../common/Skeleton";
 import { tip } from "../common/Tooltip";
 import ConfirmDialog from "../common/ConfirmDialog";
-import ConflictBlockCard from "./ConflictBlockCard";
+import MergeFileView from "./MergeFileView";
 
 const KIND_LABEL: Record<ConflictKind, MessageKey> = {
   both_modified: "conflict.kindBothModified",
@@ -33,30 +32,6 @@ const KIND_LABEL: Record<ConflictKind, MessageKey> = {
   both_deleted: "conflict.kindBothDeleted",
   unknown: "conflict.kindUnknown",
 };
-
-/** Blocks rendered per chunk: a file with 200 conflicts stays usable. */
-const SEGMENT_STEP = 15;
-/** Context lines rendered when a folded run is expanded. */
-const CONTEXT_CAP = 300;
-
-type Segment =
-  | { kind: "context"; from: number; to: number }
-  | { kind: "block"; block: ConflictBlock; index: number };
-
-function buildSegments(parsed: ParsedConflictFile | null): Segment[] {
-  if (!parsed) return [];
-  const segments: Segment[] = [];
-  let cursor = 0;
-  parsed.blocks.forEach((block, position) => {
-    if (block.start > cursor) segments.push({ kind: "context", from: cursor, to: block.start });
-    segments.push({ kind: "block", block, index: position + 1 });
-    cursor = block.end + 1;
-  });
-  if (cursor < parsed.lines.length) {
-    segments.push({ kind: "context", from: cursor, to: parsed.lines.length });
-  }
-  return segments;
-}
 
 export default function ConflictPanel() {
   const t = useT();
@@ -89,13 +64,11 @@ export default function ConflictPanel() {
   const reload = useAppStore((state) => state.refreshConflict);
   const close = useAppStore((state) => state.closeConflict);
 
-  const [limit, setLimit] = useState(SEGMENT_STEP);
   const [confirmSave, setConfirmSave] = useState(false);
   const [confirmReload, setConfirmReload] = useState(false);
   const [confirmClose, setConfirmClose] = useState(false);
   const [pendingStep, setPendingStep] = useState<number | null>(null);
 
-  const segments = useMemo(() => buildSegments(parsed), [parsed]);
   const unresolved = countUnresolved(parsed, drafts);
   const totalBlocks = parsed?.blocks.length ?? 0;
   const resolvedBlocks = totalBlocks - unresolved;
@@ -212,7 +185,7 @@ export default function ConflictPanel() {
         </div>
       </header>
 
-      <div className="min-h-0 flex-1 overflow-y-auto px-2 py-2">
+      <div className="min-h-0 flex-1 overflow-auto px-2 py-2">
         {loading && !detail ? (
           <SkeletonRows rows={5} />
         ) : !detail ? (
@@ -235,7 +208,7 @@ export default function ConflictPanel() {
                   <button
                     type="button"
                     onClick={() => applyAll("theirs")}
-                    className="rounded-md border border-negative/35 px-1.5 py-0.5 text-[10px] font-medium text-negative transition-colors hover:bg-negative/10"
+                    className="rounded-md border border-accent/35 px-1.5 py-0.5 text-[10px] font-medium text-accent transition-colors hover:bg-accent/10"
                   >
                     {t("conflict.allTheirs")}
                   </button>
@@ -250,48 +223,16 @@ export default function ConflictPanel() {
               </div>
             ) : null}
 
-            <div className="space-y-2">
-              {segments.slice(0, limit).map((segment) =>
-                segment.kind === "context" ? (
-                  <ContextLines
-                    key={`ctx-${segment.from}`}
-                    lines={parsed.lines}
-                    from={segment.from}
-                    to={segment.to}
-                  />
-                ) : (
-                  <ConflictBlockCard
-                    key={segment.block.id}
-                    block={segment.block}
-                    index={segment.index}
-                    parsed={parsed}
-                    draft={drafts[segment.block.id]}
-                    oursLabel={detail.oursLabel}
-                    theirsLabel={detail.theirsLabel}
-                    onChoose={(choice) => choose(segment.block.id, choice)}
-                    onChange={(text) => setDraft(segment.block.id, text)}
-                    onReset={() => resetDraft(segment.block.id)}
-                    onAddLine={(side, line) => addLine(segment.block.id, side, line)}
-                  />
-                ),
-              )}
-            </div>
-
-            {limit < segments.length ? (
-              <button
-                type="button"
-                onClick={() => setLimit((current) => current + SEGMENT_STEP)}
-                className="mt-2 w-full rounded-lg border border-line py-1.5 text-[11px] text-ink-soft transition-colors hover:bg-ink/4 hover:text-ink"
-              >
-                {t("conflict.showMore", { remaining: segments.length - limit })}
-              </button>
-            ) : null}
-
-            {unresolved > 0 ? (
-              <p className="mt-2 rounded-lg bg-warning/10 px-2 py-1.5 text-[10.5px] text-warning">
-                {t("conflict.remainingBlocks", { count: unresolved })}
-              </p>
-            ) : null}
+            <MergeFileView
+              parsed={parsed}
+              drafts={drafts}
+              oursLabel={detail.oursLabel}
+              theirsLabel={detail.theirsLabel}
+              onChoose={choose}
+              onChange={setDraft}
+              onReset={resetDraft}
+              onAddLine={addLine}
+            />
           </>
         ) : (
           <div className="flex min-h-0 flex-col items-center gap-3 py-6">
@@ -326,7 +267,7 @@ export default function ConflictPanel() {
                   type="button"
                   onClick={() => void resolveSide("theirs")}
                   disabled={saving}
-                  className="rounded-lg border border-negative/40 px-2 py-1 text-[11px] font-medium text-negative transition-colors hover:bg-negative/10 disabled:opacity-50"
+                  className="rounded-lg border border-accent/40 px-2 py-1 text-[11px] font-medium text-accent transition-colors hover:bg-accent/10 disabled:opacity-50"
                 >
                   {t("conflict.takeTheirsFile")}
                 </button>
@@ -346,13 +287,8 @@ export default function ConflictPanel() {
         )}
       </div>
 
-      <footer className="flex shrink-0 flex-wrap items-center gap-x-2 gap-y-1 border-t border-line px-3 py-1.5 text-[10.5px] text-ink-faint">
-        {totalBlocks > 0 ? (
-          <span>{t("conflict.summary", { resolved: resolvedBlocks, total: totalBlocks })}</span>
-        ) : (
-          <span>{t("conflict.wholeFile")}</span>
-        )}
-        <span className="ml-auto">{t("conflict.backgroundHint")}</span>
+      <footer className="flex shrink-0 items-center gap-2 border-t border-line px-3 py-1.5 text-[10.5px] text-ink-faint">
+        <span className="truncate">{t("conflict.backgroundHint")}</span>
       </footer>
 
       <ConfirmDialog
@@ -405,54 +341,5 @@ export default function ConflictPanel() {
         onCancel={() => setConfirmClose(false)}
       />
     </section>
-  );
-}
-
-/** Folded run of untouched lines between two conflict blocks. */
-function ContextLines({ lines, from, to }: { lines: string[]; from: number; to: number }) {
-  const t = useT();
-  const count = Math.max(0, to - from);
-  const [expanded, setExpanded] = useState(count <= 4);
-
-  if (count === 0) return null;
-
-  if (!expanded) {
-    return (
-      <button
-        type="button"
-        onClick={() => setExpanded(true)}
-        className="flex w-full items-center gap-1.5 rounded-md bg-canvas/50 px-2 py-1 text-left text-[10px] text-ink-faint transition-colors hover:bg-ink/5 hover:text-ink-soft"
-      >
-        ···
-        <span>{t("conflict.contextCollapsed", { count })}</span>
-        <span className="ml-auto">{t("conflict.contextExpand")}</span>
-      </button>
-    );
-  }
-
-  const visible = Math.min(count, CONTEXT_CAP);
-  return (
-    <div className="rounded-lg border border-line/60 bg-canvas/30">
-      <div className="overflow-x-auto">
-        <div className="min-w-max font-mono text-[11px] leading-[1.6] text-ink-faint">
-          {Array.from({ length: visible }, (_, offset) => (
-            <div key={from + offset} className="flex">
-              <span className="w-10 shrink-0 select-none pr-1.5 text-right text-[9.5px] opacity-70">
-                {from + offset + 1}
-              </span>
-              <span className="whitespace-pre pr-2">{lines[from + offset] ?? ""}</span>
-            </div>
-          ))}
-        </div>
-      </div>
-      <button
-        type="button"
-        onClick={() => setExpanded(false)}
-        className="w-full border-t border-line/60 py-0.5 text-[10px] text-ink-faint transition-colors hover:bg-ink/5 hover:text-ink-soft"
-      >
-        {t("conflict.contextCollapse")}
-        {count > CONTEXT_CAP ? ` · ${t("conflict.contextCapped", { count: CONTEXT_CAP })}` : ""}
-      </button>
-    </div>
   );
 }

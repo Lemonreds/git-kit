@@ -1,7 +1,8 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   AlertTriangle,
   Archive,
+  Check,
   ClipboardCopy,
   Columns2,
   Copy,
@@ -16,6 +17,7 @@ import {
   Search,
   Tag,
   Trash2,
+  UserRound,
   Undo2,
 } from "lucide-react";
 
@@ -23,22 +25,41 @@ import { useT } from "../../i18n";
 import { api } from "../../lib/ipc";
 import type { CommitDetail } from "../../lib/types";
 
-import { absoluteTime, copyText, formatCount, relativeTime, timeTooltip } from "../../lib/format";
+import { absoluteTime, clamp, copyText, formatCount, relativeTime, timeTooltip } from "../../lib/format";
 import { formatBinding, matchesBinding } from "../../lib/keymap";
 import { useAppStore } from "../../store/appStore";
 import { useSlice } from "../../store/hooks";
 import ConfirmDialog from "../common/ConfirmDialog";
 import EmptyState from "../common/EmptyState";
+import FileIcon from "../common/FileIcon";
 import IconButton from "../common/IconButton";
 import RowMenu from "../common/RowMenu";
 import ShaChip from "../common/ShaChip";
 import { SkeletonRows } from "../common/Skeleton";
+import Splitter from "../common/Splitter";
 import { tip } from "../common/Tooltip";
 import ConflictPanel from "../conflict/ConflictPanel";
 import FileHistoryPanel from "../history/FileHistoryPanel";
 import DiffSearch from "./DiffSearch";
 import DiffViewer from "./DiffViewer";
 import FileChangeList from "./FileChangeList";
+
+/** Share of the diff column taken by the file list; persists across restarts. */
+const FILES_KEY = "gk.diffFiles";
+const FILES_DEFAULT_RATIO = 0.38;
+const FILES_MIN_RATIO = 0.12;
+const FILES_MAX_RATIO = 0.72;
+/** Never smaller than this, and never taller than the ratio allows. */
+const FILES_MIN_PX = 76;
+
+function readFilesRatio(): number {
+  try {
+    const raw = Number(localStorage.getItem(FILES_KEY));
+    return Number.isFinite(raw) && raw > 0 ? clamp(raw, FILES_MIN_RATIO, FILES_MAX_RATIO) : FILES_DEFAULT_RATIO;
+  } catch {
+    return FILES_DEFAULT_RATIO;
+  }
+}
 
 export default function DiffPanel() {
   const t = useT();
@@ -69,6 +90,8 @@ export default function DiffPanel() {
   }));
 
   const setDiffMode = useAppStore((state) => state.setDiffMode);
+  const inlineBlame = useAppStore((state) => state.inlineBlame);
+  const setInlineBlame = useAppStore((state) => state.setInlineBlame);
   const selectFile = useAppStore((state) => state.selectFile);
   const refreshCommitFiles = useAppStore((state) => state.refreshCommitFiles);
   const refreshWorktreeDiff = useAppStore((state) => state.refreshWorktreeDiff);
@@ -124,6 +147,8 @@ export default function DiffPanel() {
   const [detailOpen, setDetailOpen] = useState(false);
   const [detail, setDetail] = useState<CommitDetail | null>(null);
   const [confirmRevert, setConfirmRevert] = useState(false);
+  // `git revert` has no `--no-verify`: the backend skips hooks another way.
+  const [revertSkipHooks, setRevertSkipHooks] = useState(false);
 
   useEffect(() => {
     // A stash ref is not a commit: `get_commit` would just 404 on it.
@@ -145,6 +170,83 @@ export default function DiffPanel() {
     };
   }, [selectedCommitSha, activeProject, stashPreview]);
   const scrollRef = useRef<HTMLDivElement | null>(null);
+
+  // --- file list / diff splitter -------------------------------------------
+  // The share is stored as a ratio, not pixels, so the split survives window
+  // resizes: a height that fit yesterday must not leave the diff invisible
+  // today. The container is measured because the minimum height needs pixels.
+  const [filesRatio, setFilesRatio] = useState(readFilesRatio);
+  const [bodyHeight, setBodyHeight] = useState(0);
+  const splitBodyRef = useRef<HTMLDivElement | null>(null);
+  const splitFilesRef = useRef<HTMLDivElement | null>(null);
+  const ratioRef = useRef(filesRatio);
+
+  useEffect(() => {
+    const element = splitBodyRef.current;
+    if (!element) {
+      setBodyHeight(0);
+      return undefined;
+    }
+    setBodyHeight(element.getBoundingClientRect().height);
+    const observer = new ResizeObserver((entries) => {
+      const entry = entries[0];
+      if (entry) setBodyHeight(entry.contentRect.height);
+    });
+    observer.observe(element);
+    return () => observer.disconnect();
+    // The splitter only exists in the commit / stash view.
+  }, [selectedCommitSha, stashPreview, conflictPath, fileViewOpen, worktreeTarget]);
+
+  const filesHeight =
+    bodyHeight > 0
+      ? Math.round(
+          clamp(
+            bodyHeight * filesRatio,
+            FILES_MIN_PX,
+            Math.max(FILES_MIN_PX, bodyHeight * FILES_MAX_RATIO),
+          ),
+        )
+      : null;
+
+  const beginFilesDrag = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    const total = splitBodyRef.current?.getBoundingClientRect().height ?? 0;
+    if (total <= 0) return;
+    const startY = event.clientY;
+    const startHeight = splitFilesRef.current?.getBoundingClientRect().height ?? 0;
+    const limit = Math.max(FILES_MIN_PX, total * FILES_MAX_RATIO);
+
+    const onMove = (move: PointerEvent) => {
+      const next = clamp(startHeight + (move.clientY - startY), FILES_MIN_PX, limit);
+      ratioRef.current = next / total;
+      setFilesRatio(ratioRef.current);
+    };
+
+    const onUp = () => {
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+      document.body.classList.remove("select-none", "cursor-row-resize");
+      try {
+        localStorage.setItem(FILES_KEY, String(ratioRef.current));
+      } catch {
+        // Private mode / quota: the split just will not survive a restart.
+      }
+    };
+
+    document.body.classList.add("select-none", "cursor-row-resize");
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp);
+  }, []);
+
+  const resetFilesHeight = useCallback(() => {
+    ratioRef.current = FILES_DEFAULT_RATIO;
+    setFilesRatio(FILES_DEFAULT_RATIO);
+    try {
+      localStorage.removeItem(FILES_KEY);
+    } catch {
+      // Nothing to clean up.
+    }
+  }, []);
 
   // The in-diff finder is a local command: the binding is user-editable, but
   // the search state lives here, so this component does the matching.
@@ -231,7 +333,7 @@ export default function DiffPanel() {
               drop below it so they never squeeze the actions. */}
           <div className="flex min-w-0 flex-1 flex-col justify-center gap-0.5 py-1">
             <div className="flex min-w-0 items-center gap-1.5">
-              <FileDiffIcon size={12} className="shrink-0 text-ink-faint" />
+              <FileIcon path={worktreeTarget.path} size={13} />
               <span
                 className="min-w-0 truncate font-mono text-[11.5px] text-ink"
                 {...tip(worktreeTarget.path)}
@@ -326,6 +428,12 @@ export default function DiffPanel() {
                       : t("diff.switchToUnified"),
                   icon: diffMode === "unified" ? <Columns2 size={12} /> : <Rows3 size={12} />,
                   onSelect: () => setDiffMode(diffMode === "unified" ? "split" : "unified"),
+                },
+                {
+                  label: t("diff.inlineBlame"),
+                  icon: <UserRound size={12} />,
+                  checked: inlineBlame,
+                  onSelect: () => setInlineBlame(!inlineBlame),
                 },
                 {
                   label: t("diff.discardFileChanges"),
@@ -492,6 +600,12 @@ export default function DiffPanel() {
                   onSelect: () => setDiffMode(diffMode === "unified" ? "split" : "unified"),
                 },
                 {
+                  label: t("diff.inlineBlame"),
+                  icon: <UserRound size={12} />,
+                  checked: inlineBlame,
+                  onSelect: () => setInlineBlame(!inlineBlame),
+                },
+                {
                   label: t("diff.addTag"),
                   icon: <Tag size={12} />,
                   separatorBefore: true,
@@ -559,8 +673,17 @@ export default function DiffPanel() {
       {!selectedCommitSha ? (
         <EmptyState icon={FileDiffIcon} title={t("diff.comparison")} />
       ) : (
-        <div className="flex min-h-0 flex-1 flex-col">
-          <div className="max-h-[38%] shrink-0 overflow-y-auto border-b border-line bg-canvas/40">
+        <div
+          ref={splitBodyRef}
+          className="grid min-h-0 flex-1"
+          style={{
+            gridTemplateRows:
+              filesHeight === null
+                ? "minmax(0, 38%) 6px minmax(0, 1fr)"
+                : `${filesHeight}px 6px minmax(0, 1fr)`,
+          }}
+        >
+          <div ref={splitFilesRef} className="min-h-0 overflow-y-auto bg-canvas/40">
             {filesLoading ? (
               <SkeletonRows rows={4} />
             ) : files.length === 0 ? (
@@ -574,7 +697,14 @@ export default function DiffPanel() {
             )}
           </div>
 
-          <div className="relative min-h-0 flex-1">
+          <Splitter
+            horizontal
+            label={t("layout.resizeFileList")}
+            onPointerDown={beginFilesDrag}
+            onDoubleClick={resetFilesHeight}
+          />
+
+          <div className="relative min-h-0">
             <div ref={scrollRef} className="h-full overflow-auto bg-panel">
               {diffLoading ? (
                 <div className="flex h-full items-center justify-center gap-2 text-[11.5px] text-ink-faint">
@@ -605,14 +735,36 @@ export default function DiffPanel() {
         onConfirm={() => {
           setConfirmRevert(false);
           if (!selectedCommitSha) return;
-          void revertCommit(selectedCommitSha).then((outcome) => {
+          void revertCommit(selectedCommitSha, revertSkipHooks).then((outcome) => {
             if (!outcome.ok && outcome.message) {
               showAlert(t("diff.revertFailed"), outcome.message);
             }
           });
         }}
         onCancel={() => setConfirmRevert(false)}
-      />
+      >
+        <label className="mt-3 flex cursor-pointer items-start gap-2 rounded-lg border border-line bg-canvas/40 px-2.5 py-1.5">
+          <span
+            className={`mt-0.5 grid h-3.5 w-3.5 shrink-0 place-items-center rounded-[4px] border transition-colors ${
+              revertSkipHooks ? "border-accent bg-accent text-white" : "border-line-strong bg-panel"
+            }`}
+          >
+            {revertSkipHooks ? <Check size={9} strokeWidth={3} /> : null}
+          </span>
+          <input
+            type="checkbox"
+            checked={revertSkipHooks}
+            onChange={() => setRevertSkipHooks((value) => !value)}
+            className="sr-only"
+          />
+          <span className="min-w-0 flex-1 text-[11px] leading-relaxed text-ink-soft">
+            {t("diff.revertSkipHooks")}
+            <span className="mt-0.5 block text-[10px] text-ink-faint">
+              {t("diff.revertSkipHooksHint")}
+            </span>
+          </span>
+        </label>
+      </ConfirmDialog>
     </section>
   );
 }

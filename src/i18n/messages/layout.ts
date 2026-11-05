@@ -11,6 +11,7 @@ export const zh = {
   "layout.settings": "设置",
   "layout.resizeTerminal": "调整终端面板高度",
   "layout.resizePanel": "调整面板宽度",
+  "layout.resizeFileList": "调整文件列表与代码区高度",
 
   "workspace.emptyTitle": "还没有项目",
   "workspace.emptyDescription": "从左侧添加一个本地 Git 仓库，即可开始浏览。",
@@ -35,11 +36,17 @@ export const zh = {
   "workspace.continue": "继续",
   "workspace.skip": "跳过",
   "workspace.abort": "中止",
+  "workspace.skipHooks": "跳过钩子（-n）",
+  "workspace.skipHooksHint":
+    "继续时加 --no-verify，跳过 git 钩子（revert / cherry-pick 通过关闭 hooksPath 实现）。",
 
   "workspace.branchTip": "当前分支：{branch}",
   "workspace.noBranch": "无分支",
   "workspace.detachedTip": "当前为游离 HEAD 或无分支",
   "workspace.dirtyTip": "有未提交的改动",
+  "workspace.branchPickerPlaceholder": "筛选分支",
+  "workspace.branchPickerEmpty": "没有匹配的分支",
+  "workspace.branchPickerDetached": "游离 HEAD，选择分支切回",
   "workspace.remoteTip": "远程地址：{url}",
   "workspace.noRemoteTip": "未配置远程，点击添加",
   "workspace.noRemote": "未配置远程地址",
@@ -56,6 +63,7 @@ export const en: Record<keyof typeof zh, Message> = {
   "layout.settings": "Settings",
   "layout.resizeTerminal": "Resize the terminal panel",
   "layout.resizePanel": "Resize the panel",
+  "layout.resizeFileList": "Resize the file list and code areas",
 
   "workspace.emptyTitle": "No projects yet",
   "workspace.emptyDescription": "Add a local Git repository on the left to start browsing.",
@@ -81,11 +89,17 @@ export const en: Record<keyof typeof zh, Message> = {
   "workspace.continue": "Continue",
   "workspace.skip": "Skip",
   "workspace.abort": "Abort",
+  "workspace.skipHooks": "Skip hooks (-n)",
+  "workspace.skipHooksHint":
+    "Adds --no-verify when continuing, skipping git hooks (revert / cherry-pick bypass hooksPath instead).",
 
   "workspace.branchTip": "Current branch: {branch}",
   "workspace.noBranch": "No branch",
   "workspace.detachedTip": "Detached HEAD or no branch",
   "workspace.dirtyTip": "Uncommitted changes",
+  "workspace.branchPickerPlaceholder": "Filter branches",
+  "workspace.branchPickerEmpty": "No matching branches",
+  "workspace.branchPickerDetached": "Detached HEAD — pick a branch to switch back",
   "workspace.remoteTip": "Remote URL: {url}",
   "workspace.noRemoteTip": "No remote — click to add one",
   "workspace.noRemote": "No remote configured",

@@ -1,8 +1,10 @@
+import { useState } from "react";
 import { AlertTriangle, Ban, Check, SkipForward, Wrench } from "lucide-react";
 
 import type { MessageKey } from "../../i18n";
 import { useT } from "../../i18n";
 import { useAppStore } from "../../store/appStore";
+import { tip } from "../common/Tooltip";
 
 const OP_LABEL: Record<string, MessageKey> = {
   merge: "workspace.opMerge",
@@ -20,6 +22,9 @@ export default function RepoStateBanner() {
   const state = useAppStore((store) => store.repoState);
   const repoOperation = useAppStore((store) => store.repoOperation);
   const openConflict = useAppStore((store) => store.openConflict);
+  // Opt-in per click: a hook that hangs while finishing a merge must be
+  // skippable without editing the hook from the settings pane first.
+  const [skipHooks, setSkipHooks] = useState(false);
 
   if (!state || state.kind === "none") return null;
 
@@ -55,6 +60,19 @@ export default function RepoStateBanner() {
       )}
 
       <span className="ml-auto flex items-center gap-1">
+        <button
+          type="button"
+          onClick={() => setSkipHooks((value) => !value)}
+          aria-pressed={skipHooks}
+          {...tip(t("workspace.skipHooksHint"))}
+          className={`inline-flex items-center gap-1 rounded-md border px-1.5 py-0.5 text-[10px] transition-colors ${
+            skipHooks
+              ? "border-accent/50 bg-accent/15 text-accent"
+              : "border-line text-ink-faint hover:bg-ink/5 hover:text-ink-soft"
+          }`}
+        >
+          {t("workspace.skipHooks")}
+        </button>
         {hasConflicts ? (
           <button
             type="button"
@@ -67,7 +85,7 @@ export default function RepoStateBanner() {
         ) : null}
         <button
           type="button"
-          onClick={() => void repoOperation("continue")}
+          onClick={() => void repoOperation("continue", skipHooks)}
           disabled={hasConflicts}
           title={hasConflicts ? t("workspace.continueBlocked") : undefined}
           className="inline-flex items-center gap-1 rounded-md bg-accent px-1.5 py-0.5 text-[10.5px] font-medium text-white transition-opacity hover:opacity-90 disabled:cursor-default disabled:opacity-40"

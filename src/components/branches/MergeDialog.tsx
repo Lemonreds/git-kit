@@ -49,6 +49,7 @@ export default function MergeDialog({ current, onClose }: MergeDialogProps) {
     pickDefaultSource(allBranches, current.refName),
   );
   const [noFf, setNoFf] = useState(false);
+  const [skipHooks, setSkipHooks] = useState(false);
   const [preview, setPreview] = useState<MergePreview | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -76,7 +77,7 @@ export default function MergeDialog({ current, onClose }: MergeDialogProps) {
   const submit = async () => {
     if (busy || !sourceRef) return;
     setBusy(true);
-    const outcome = await mergeBranch(sourceRef, noFf);
+    const outcome = await mergeBranch(sourceRef, noFf, skipHooks);
     setBusy(false);
     if (outcome.ok) {
       onClose();
@@ -176,6 +177,28 @@ export default function MergeDialog({ current, onClose }: MergeDialogProps) {
             {t("branches.noFfLabel")}
             <span className="mt-0.5 block text-[10px] text-ink-faint">
               {t("branches.noFfHint")}
+            </span>
+          </span>
+        </label>
+
+        <label className="flex cursor-pointer items-start gap-2 rounded-lg border border-line bg-canvas/40 px-3 py-2">
+          <span
+            className={`mt-0.5 grid h-3.5 w-3.5 shrink-0 place-items-center rounded-[4px] border transition-colors ${
+              skipHooks ? "border-accent bg-accent text-white" : "border-line-strong bg-panel"
+            }`}
+          >
+            {skipHooks ? <Check size={9} strokeWidth={3} /> : null}
+          </span>
+          <input
+            type="checkbox"
+            checked={skipHooks}
+            onChange={() => setSkipHooks((value) => !value)}
+            className="sr-only"
+          />
+          <span className="min-w-0 flex-1 text-[11px] leading-relaxed text-ink-soft">
+            {t("branches.skipHooksLabel")}
+            <span className="mt-0.5 block text-[10px] text-ink-faint">
+              {t("branches.skipHooksHint")}
             </span>
           </span>
         </label>

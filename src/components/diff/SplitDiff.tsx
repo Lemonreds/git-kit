@@ -1,7 +1,9 @@
 import { Fragment } from "react";
 
 import { useT } from "../../i18n";
+import type { InlineBlameLine } from "../../lib/inlineBlame";
 import type { DiffLine, SplitRowItem } from "../../lib/parsePatch";
+import BlameNote from "./BlameNote";
 import DiffText from "./DiffText";
 
 function tint(line: DiffLine | null): string {
@@ -15,11 +17,14 @@ export default function SplitDiff({
   rows,
   limit,
   query = "",
+  blame = null,
 }: {
   rows: SplitRowItem[];
   /** How many rows to render (the rest is hidden until the user scrolls). */
   limit: number;
   query?: string;
+  /** New-side line number → the commit that last touched it. */
+  blame?: Map<number, InlineBlameLine> | null;
 }) {
   const t = useT();
   if (rows.length === 0) {
@@ -55,6 +60,9 @@ export default function SplitDiff({
             </span>
             <span className={`split-cell px-2 py-0.5 ${tint(right)}`}>
               {right ? <DiffText text={right.text} query={query} /> : null}
+              {blame && right?.newNumber != null ? (
+                <BlameNote line={blame.get(right.newNumber)} />
+              ) : null}
             </span>
           </Fragment>
         );

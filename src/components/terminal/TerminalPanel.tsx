@@ -1,4 +1,4 @@
-import { ChevronDown, Eraser, GitBranch, Plus, SquareTerminal, X } from "lucide-react";
+import { ChevronDown, Eraser, GitBranch, Plus, Power, SquareTerminal, X } from "lucide-react";
 
 import { useT } from "../../i18n";
 import { clearTerminal } from "../../lib/terminal";
@@ -31,6 +31,7 @@ export default function TerminalPanel() {
 
   const activateTerminal = useAppStore((state) => state.activateTerminal);
   const closeTerminal = useAppStore((state) => state.closeTerminal);
+  const shutdownTerminal = useAppStore((state) => state.shutdownTerminal);
   const setTerminalOpen = useAppStore((state) => state.setTerminalOpen);
   const openTerminal = useAppStore((state) => state.openTerminal);
 
@@ -134,13 +135,21 @@ export default function TerminalPanel() {
           >
             <Eraser size={13} />
           </IconButton>
+          <IconButton
+            label={t("terminal.shutdown")}
+            size="sm"
+            disabled={!active || active.status !== "live"}
+            onClick={() => active && shutdownTerminal(active.id)}
+          >
+            <Power size={13} />
+          </IconButton>
           <IconButton label={t("terminal.collapse")} size="sm" onClick={() => setTerminalOpen(false)}>
             <ChevronDown size={13} />
           </IconButton>
         </div>
       </div>
 
-      <div className="relative min-h-0 flex-1 bg-panel pt-1">
+      <div className="relative min-h-0 flex-1 overflow-hidden bg-panel pt-1">
         {terminals.map((tab) => (
           <TerminalView
             key={tab.id}

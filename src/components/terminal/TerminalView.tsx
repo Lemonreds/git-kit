@@ -59,7 +59,7 @@ export default function TerminalView({ tab, active }: TerminalViewProps) {
     <div
       ref={host}
       data-terminal={tab.id}
-      className={active ? "h-full w-full px-2 pb-1" : "hidden"}
+      className={active ? "h-full w-full overflow-hidden px-2 pb-1" : "hidden"}
     />
   );
 }

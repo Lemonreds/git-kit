@@ -4,6 +4,7 @@ import { useT } from "../../i18n";
 import { baseName, dirName, statusMeta } from "../../lib/format";
 import type { WorktreeEntry } from "../../lib/types";
 import type { FileStatus } from "../../lib/types";
+import FileIcon from "../common/FileIcon";
 import IconButton from "../common/IconButton";
 import { tip } from "../common/Tooltip";
 
@@ -56,13 +57,7 @@ export default function ChangeRow({
         aria-current={active ? "true" : undefined}
         className="flex min-w-0 flex-1 items-center gap-2 px-2 py-[7px] text-left"
       >
-        <span
-          className={`grid h-[16px] w-[16px] shrink-0 place-items-center rounded-[4px] text-[9px] font-bold ${
-            conflicted ? "bg-negative/14 text-negative" : TONE_CLASS[meta.tone]
-          }`}
-          {...tip(conflicted ? t("changes.conflict") : meta.label)}        >
-          {conflicted ? "!" : meta.letter}
-        </span>
+        <FileIcon path={entry.path} />
 
         <span className="min-w-0 flex-1 truncate font-mono text-[11.5px] text-ink-soft">
           {entry.oldPath ? (
@@ -79,11 +74,23 @@ export default function ChangeRow({
           )}
         </span>
 
-        {status === "untracked" ? (
-          <span className="shrink-0 rounded bg-positive/12 px-1 py-px text-[9px] font-medium text-positive">
-            {t("changes.untracked")}
+        {/* Trailing metadata: it fades out while the hover actions take the
+            same corner, so neither ever sits on top of the other. */}
+        <span className="flex shrink-0 items-center gap-1.5 transition-opacity group-hover:opacity-0 group-focus-within:opacity-0">
+          {status === "untracked" ? (
+            <span className="rounded bg-positive/12 px-1 py-px text-[9px] font-medium text-positive">
+              {t("changes.untracked")}
+            </span>
+          ) : null}
+          <span
+            className={`grid h-[15px] w-[15px] place-items-center rounded-[4px] text-[9px] font-bold ${
+              conflicted ? "bg-negative/14 text-negative" : TONE_CLASS[meta.tone]
+            }`}
+            {...tip(conflicted ? t("changes.conflict") : meta.label)}
+          >
+            {conflicted ? "!" : meta.letter}
           </span>
-        ) : null}
+        </span>
       </button>
 
       <div className="absolute right-1 top-1/2 hidden -translate-y-1/2 items-center gap-0.5 rounded-md bg-raised/95 px-0.5 py-0.5 shadow-float group-hover:flex group-focus-within:flex">

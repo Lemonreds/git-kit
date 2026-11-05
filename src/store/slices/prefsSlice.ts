@@ -9,12 +9,26 @@ import type { AppState } from "../appStore";
 
 export type { Theme };
 
+const INLINE_BLAME_KEY = "gk.inlineBlame";
+
+/** GitLens-style per-line attribution in the diff view. On unless turned off. */
+function readInlineBlame(): boolean {
+  try {
+    return localStorage.getItem(INLINE_BLAME_KEY) !== "false";
+  } catch {
+    return true;
+  }
+}
+
 export interface PrefsSlice {
   theme: Theme;
   /** Effective bindings: stored overrides already merged over the defaults. */
   keymap: Keymap;
+  /** Show the last commit that touched each line in the diff view. */
+  inlineBlame: boolean;
 
   setTheme: (theme: Theme) => void;
+  setInlineBlame: (enabled: boolean) => void;
   setBinding: (id: CommandId, binding: Binding | null) => void;
   resetBinding: (id: CommandId) => void;
   resetKeymap: () => void;
@@ -45,11 +59,21 @@ export const createPrefsSlice: StateCreator<AppState, [], [], PrefsSlice> = (set
   return {
     theme: readTheme(),
     keymap: resolveKeymap(readKeymap()),
+    inlineBlame: readInlineBlame(),
 
     setTheme(theme) {
       setStoredTheme(theme);
       applyTheme(theme);
       set({ theme });
+    },
+
+    setInlineBlame(enabled) {
+      try {
+        localStorage.setItem(INLINE_BLAME_KEY, String(enabled));
+      } catch {
+        // Private mode / quota: the choice just will not survive a restart.
+      }
+      set({ inlineBlame: enabled });
     },
 
     setBinding(id, binding) {

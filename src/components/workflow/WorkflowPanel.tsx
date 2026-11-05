@@ -257,6 +257,25 @@ function WorkflowEditor({ initial, branches, onSave, onClose }: EditorProps) {
                     </label>
                   ) : null}
 
+                  {step.kind === "commit" || step.kind === "pull" || step.kind === "merge" ? (
+                    <label className="mt-2 flex cursor-pointer items-center gap-1.5 text-[11px] text-ink-faint">
+                      <span
+                        className={`grid h-3.5 w-3.5 place-items-center rounded-[4px] border transition-colors ${
+                          step.noVerify ? "border-accent bg-accent text-white" : "border-line-strong bg-panel"
+                        }`}
+                      >
+                        {step.noVerify ? <Check size={9} strokeWidth={3} /> : null}
+                      </span>
+                      <input
+                        type="checkbox"
+                        checked={step.noVerify === true}
+                        onChange={() => patch(index, { noVerify: step.noVerify !== true })}
+                        className="sr-only"
+                      />
+                      {t("workflow.skipHooks")}
+                    </label>
+                  ) : null}
+
                   {step.kind === "merge" || step.kind === "rebase" ? (
                     <div className="mt-2 flex items-center gap-2">
                       <span className="shrink-0 text-[11px] text-ink-faint">

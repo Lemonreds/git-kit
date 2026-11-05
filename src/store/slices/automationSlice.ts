@@ -90,7 +90,12 @@ export const createAutomationSlice: StateCreator<AppState, [], [], AutomationSli
       case "pull": {
         const current = await currentBranch();
         if (!current) return { ok: false, error: t("workflow.noCurrentBranch") };
-        const outcome = await get().pullBranch(current.name, step.merge === true);
+        const outcome = await get().pullBranch(
+          current.name,
+          step.merge === true,
+          false,
+          step.noVerify === true,
+        );
         return { ok: outcome.ok, error: outcome.message };
       }
       case "push": {
@@ -110,7 +115,7 @@ export const createAutomationSlice: StateCreator<AppState, [], [], AutomationSli
       case "merge": {
         const source = (step.source ?? "").trim();
         if (!source) return { ok: false, error: t("workflow.noSource") };
-        const outcome = await get().mergeBranch(source, false);
+        const outcome = await get().mergeBranch(source, false, step.noVerify === true);
         return { ok: outcome.ok, error: outcome.message };
       }
       case "stash": {
@@ -133,7 +138,7 @@ export const createAutomationSlice: StateCreator<AppState, [], [], AutomationSli
         const entries = get().changes?.entries ?? [];
         const staged = entries.filter((entry) => entry.staged && !entry.conflicted);
         if (staged.length === 0) return { ok: true, skip: true };
-        const ok = await get().commitStaged(message);
+        const ok = await get().commitStaged(message, step.noVerify === true);
         return { ok };
       }
       default:

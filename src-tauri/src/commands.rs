@@ -1,12 +1,13 @@
 use std::path::Path;
 use std::sync::Mutex;
 
+use tauri::Manager;
 use tauri::State;
 
 use crate::error::AppError;
 use crate::git::{
-    branches, commits, config, conflict, diff, history, hooks, ops, repo as git_repo, status,
-    workflow,
+    branches, clone as git_clone, commits, config, conflict, diff, history, hooks, ops,
+    repo as git_repo, status, workflow,
 };
 use crate::model::{
     AppSettings, BlameWindow, BranchSummary, BranchTemplate, CheckoutResult, CherryPickResult,
@@ -96,11 +97,70 @@ pub fn add_project(
     state: State<'_, ProjectStoreState>,
 ) -> Result<ProjectView, AppError> {
     let canonical = git_repo::canonical_path(&path)?;
-    let canonical_str = canonical.display().to_string();
-    let repo = git_repo::open_repo(&canonical_str)?;
-    let name = git_repo::display_name(&repo, &canonical);
+    register_project(&canonical, &state, true)
+}
 
-    let mut store = lock_store(&state)?;
+/// Open (or focus) a second window pinned to one repository.
+///
+/// A window is a label plus a `?project=<id>` query parameter: the frontend reads
+/// that on boot, keeps only that project active and hides the project column, so
+/// two windows never share the "which repo am I looking at" state. The project
+/// itself must already be registered — this command never touches the store.
+#[tauri::command(async)]
+pub fn open_project_window(
+    app: tauri::AppHandle,
+    project_id: String,
+    name: String,
+) -> Result<(), AppError> {
+    let label = format!("project-{project_id}");
+    if let Some(window) = app.get_webview_window(&label) {
+        let _ = window.unminimize();
+        let _ = window.set_focus();
+        return Ok(());
+    }
+
+    let url = tauri::WebviewUrl::App(format!("index.html?project={project_id}").into());
+    let builder = tauri::WebviewWindowBuilder::new(&app, &label, url)
+        .title(&name)
+        .inner_size(1440.0, 900.0)
+        .min_inner_size(1080.0, 680.0);
+
+    // The main window uses the overlay title bar (the app draws its own bar), so
+    // a new window has to match or it would render two headers.
+    #[cfg(target_os = "macos")]
+    let builder = builder
+        .title_bar_style(tauri::TitleBarStyle::Overlay)
+        .hidden_title(true)
+        .traffic_light_position(tauri::LogicalPosition::new(18.0, 22.0));
+
+    builder
+        .build()
+        .map_err(|error| AppError::message(format!("打开新窗口失败：{error}")))?;
+    Ok(())
+}
+
+/// Register a folder that is already on disk as a project.
+///
+/// Shared by "add project" and "clone": a fresh clone needs exactly the same
+/// bookkeeping (stable id when the folder is already known, preserved pin state),
+/// so the two entry points cannot drift apart.
+///
+/// `activate` controls the persisted last-active pointer. "Add project" is a
+/// direct answer to the user picking a folder, so it becomes the open repository.
+/// A clone only joins the sidebar — switching the repository behind the user's
+/// back is not what they asked for, and the choice has to survive a restart too.
+fn register_project(
+    canonical: &Path,
+    state: &State<'_, ProjectStoreState>,
+    activate: bool,
+) -> Result<ProjectView, AppError> {
+    let canonical_str = canonical.display().to_string();
+    // Opened before the store is locked: a git2 open touches the filesystem and
+    // must not extend the window in which the JSON store is held.
+    let repo = git_repo::open_repo(&canonical_str)?;
+    let name = git_repo::display_name(&repo, canonical);
+
+    let mut store = lock_store(state)?;
     let existing = store.find_by_path(&canonical_str).cloned();
     let id = existing
         .as_ref()
@@ -110,7 +170,7 @@ pub fn add_project(
         .as_ref()
         .map_or_else(now, |project| project.added_at);
 
-    let record = ProjectRecord {
+    store.upsert(ProjectRecord {
         id: id.clone(),
         path: canonical_str,
         name,
@@ -118,15 +178,42 @@ pub fn add_project(
         last_opened_at: now(),
         pinned: existing.as_ref().is_some_and(|project| project.pinned),
         pinned_at: existing.as_ref().and_then(|project| project.pinned_at),
-    };
-    store.upsert(record)?;
-    store.set_last_active(Some(id))?;
+    })?;
+    if activate {
+        store.set_last_active(Some(id))?;
+    }
 
     let saved = store
         .find_by_path(&canonical.display().to_string())
         .cloned()
         .ok_or_else(|| AppError::message("项目保存失败"))?;
     Ok(to_view(&saved))
+}
+
+/// `git clone` into `<parentDir>/<name>`, then add the result to the sidebar.
+///
+/// The clone itself already runs against the system git (credentials, SSH keys,
+/// proxy), so this command only validates the destination, keeps git's error
+/// output intact and then registers the folder like any other project.
+#[tauri::command(async)]
+pub fn clone_repo(
+    parent_dir: String,
+    url: String,
+    name: Option<String>,
+    state: State<'_, ProjectStoreState>,
+) -> Result<ProjectView, AppError> {
+    let parent = git_repo::canonical_path(&parent_dir)?;
+    // An empty name (or none at all) falls back to the last segment of the URL;
+    // the UI pre-fills that but the backend must not depend on it.
+    let requested = name.unwrap_or_default();
+    let name = if requested.trim().is_empty() {
+        git_clone::repo_name_from_url(&url)
+    } else {
+        requested
+    };
+
+    let cloned = git_clone::clone_repo(&parent, &url, &name)?;
+    register_project(&cloned, &state, false)
 }
 
 /// Point an existing sidebar entry at a new folder (moved repo, revoked
@@ -458,8 +545,15 @@ pub fn squash_commits(
     branch: String,
     count: usize,
     message: String,
+    no_verify: Option<bool>,
 ) -> Result<SquashResult, AppError> {
-    ops::squash_commits(std::path::Path::new(&repo_path), &branch, count, &message)
+    ops::squash_commits(
+        std::path::Path::new(&repo_path),
+        &branch,
+        count,
+        &message,
+        no_verify.unwrap_or(false),
+    )
 }
 
 #[tauri::command(async)]
@@ -468,12 +562,14 @@ pub fn cherry_pick(
     source_branch: String,
     target_branch: String,
     shas: Vec<String>,
+    no_verify: Option<bool>,
 ) -> Result<CherryPickResult, AppError> {
     ops::cherry_pick(
         std::path::Path::new(&repo_path),
         &source_branch,
         &target_branch,
         &shas,
+        no_verify.unwrap_or(false),
     )
 }
 
@@ -533,12 +629,14 @@ pub fn pull_branch(
     branch: String,
     allow_merge: Option<bool>,
     switch_first: Option<bool>,
+    no_verify: Option<bool>,
 ) -> Result<PullResult, AppError> {
     ops::pull_branch(
         std::path::Path::new(&repo_path),
         &branch,
         allow_merge.unwrap_or(false),
         switch_first.unwrap_or(false),
+        no_verify.unwrap_or(false),
     )
 }
 
@@ -710,8 +808,13 @@ pub fn file_history(
 pub fn repo_operation_action(
     repo_path: String,
     action: String,
+    no_verify: Option<bool>,
 ) -> Result<RepoOperationState, AppError> {
-    workflow::operation_action(std::path::Path::new(&repo_path), &action)
+    workflow::operation_action(
+        std::path::Path::new(&repo_path),
+        &action,
+        no_verify.unwrap_or(false),
+    )
 }
 
 #[tauri::command(async)]
@@ -749,8 +852,16 @@ pub fn head_commit_preview(repo_path: String) -> Result<HeadCommitPreview, AppEr
 }
 
 #[tauri::command(async)]
-pub fn amend_commit(repo_path: String, message: String) -> Result<CommitResult, AppError> {
-    workflow::amend_commit(std::path::Path::new(&repo_path), &message)
+pub fn amend_commit(
+    repo_path: String,
+    message: String,
+    no_verify: Option<bool>,
+) -> Result<CommitResult, AppError> {
+    workflow::amend_commit(
+        std::path::Path::new(&repo_path),
+        &message,
+        no_verify.unwrap_or(false),
+    )
 }
 
 #[tauri::command(async)]
@@ -773,17 +884,27 @@ pub fn merge_branch(
     repo_path: String,
     source: String,
     no_ff: Option<bool>,
+    no_verify: Option<bool>,
 ) -> Result<MergeResult, AppError> {
     workflow::merge_branch(
         std::path::Path::new(&repo_path),
         &source,
         no_ff.unwrap_or(false),
+        no_verify.unwrap_or(false),
     )
 }
 
 #[tauri::command(async)]
-pub fn revert_commit(repo_path: String, sha: String) -> Result<CommitResult, AppError> {
-    workflow::revert_commit(std::path::Path::new(&repo_path), &sha)
+pub fn revert_commit(
+    repo_path: String,
+    sha: String,
+    no_verify: Option<bool>,
+) -> Result<CommitResult, AppError> {
+    workflow::revert_commit(
+        std::path::Path::new(&repo_path),
+        &sha,
+        no_verify.unwrap_or(false),
+    )
 }
 
 #[tauri::command(async)]

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Loader2 } from "lucide-react";
+import { Check, Loader2 } from "lucide-react";
 
 import { useT } from "../../i18n";
 import { api } from "../../lib/ipc";
@@ -23,6 +23,7 @@ export default function SquashDialog({ branch, onClose }: SquashDialogProps) {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [count, setCount] = useState("1");
   const [message, setMessage] = useState("");
+  const [skipHooks, setSkipHooks] = useState(false);
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
@@ -70,7 +71,7 @@ export default function SquashDialog({ branch, onClose }: SquashDialogProps) {
   const submit = async () => {
     if (!valid || busy) return;
     setBusy(true);
-    const ok = await squashBranch(branch.name, numeric, message.trim());
+    const ok = await squashBranch(branch.name, numeric, message.trim(), skipHooks);
     setBusy(false);
     if (ok) onClose();
   };
@@ -194,6 +195,28 @@ export default function SquashDialog({ branch, onClose }: SquashDialogProps) {
               className="w-full resize-y rounded-lg border border-line bg-panel px-2.5 py-1.5 font-mono text-[11.5px] leading-relaxed text-ink outline-none transition-colors focus:border-accent/60"
             />
           </label>
+
+          <div className="flex items-center justify-between rounded-lg border border-line bg-canvas/40 px-2.5 py-1.5">
+            <button
+              type="button"
+              onClick={() => setSkipHooks((value) => !value)}
+              disabled={busy}
+              className="flex items-center gap-2 text-left"
+            >
+              <span
+                className={`grid h-3.5 w-3.5 shrink-0 place-items-center rounded-[4px] border transition-colors ${
+                  skipHooks ? "border-accent bg-accent text-white" : "border-line-strong bg-panel"
+                }`}
+              >
+                {skipHooks ? <Check size={9} strokeWidth={3} /> : null}
+              </span>
+              <span className="text-[11.5px] text-ink">{t("branches.skipHooksLabel")}</span>
+            </button>
+            <span className="flex shrink-0 items-center gap-1.5 text-[10px] text-ink-faint">
+              <span className="font-mono">{skipHooks ? "git commit -n" : ""}</span>
+              <HelpTip label={t("branches.skipHooksHint")} />
+            </span>
+          </div>
         </div>
       )}
     </Modal>

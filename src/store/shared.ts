@@ -1,4 +1,5 @@
 import { t } from "../i18n";
+import { clearInlineBlameCache } from "../lib/inlineBlame";
 import { translateError } from "../i18n/errors";
 import type {
   BlameWindow,
@@ -73,6 +74,9 @@ export function invalidateCaches() {
   diffCache.clear();
   historyCache.clear();
   blameCache.clear();
+  // Inline annotations point at commits; after a commit / checkout / rebase they
+  // describe a file state that no longer exists.
+  clearInlineBlameCache();
 }
 
 /**

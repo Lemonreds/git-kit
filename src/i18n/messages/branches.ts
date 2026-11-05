@@ -229,6 +229,9 @@ export const zh = {
   "branches.mergeCommitsIncoming": "将合并进来的提交",
   "branches.noFfLabel": "始终创建合并提交（--no-ff）",
   "branches.noFfHint": "不勾选时，能快进就直接快进，历史保持线性。",
+  "branches.skipHooksLabel": "跳过提交前置检查（-n）",
+  "branches.skipHooksHint":
+    "加 --no-verify，跳过 pre-commit / commit-msg / pre-merge-commit 钩子。默认不跳过。",
   "branches.dirtyMerge": "工作区有未提交改动，若与合并内容冲突会失败，建议先提交或暂存。",
   "branches.mergeConflict": "合并出现冲突，仓库停留在 merge 状态",
   "branches.mergeFailed": "合并失败",
@@ -560,6 +563,9 @@ export const en: Record<keyof typeof zh, Message> = {
   "branches.mergeCommitsIncoming": "Commits that come in",
   "branches.noFfLabel": "Always create a merge commit (--no-ff)",
   "branches.noFfHint": "When unchecked, the merge fast-forwards whenever possible and keeps history linear.",
+  "branches.skipHooksLabel": "Skip commit hooks (-n)",
+  "branches.skipHooksHint":
+    "Adds --no-verify, skipping the pre-commit / commit-msg / pre-merge-commit hooks. Off by default.",
   "branches.dirtyMerge": "The working tree has uncommitted changes; if they collide with the merge it fails, so commit or stash them first.",
   "branches.mergeConflict": "Conflicts during merge, the repository stays in the merge state",
   "branches.mergeFailed": "Merge failed",

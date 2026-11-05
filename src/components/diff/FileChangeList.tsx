@@ -1,7 +1,11 @@
+import { Copy } from "lucide-react";
+
 import { useT } from "../../i18n";
 import { baseName, copyText, dirName, statusMeta } from "../../lib/format";
 import type { FileChange } from "../../lib/types";
 import { useAppStore } from "../../store/appStore";
+import FileIcon from "../common/FileIcon";
+import IconButton from "../common/IconButton";
 import { tip } from "../common/Tooltip";
 
 const TONE_CLASS: Record<string, string> = {
@@ -18,14 +22,20 @@ interface FileChangeListProps {
   onSelect: (file: FileChange) => void;
 }
 
+/**
+ * The commit / stash file list.
+ *
+ * The row is a container rather than one big button so the copy action can live
+ * beside it: a button nested in a button is invalid, and an inline copy handler
+ * on the path used to swallow the click that should have opened the diff.
+ */
 export default function FileChangeList({ files, selectedPath, onSelect }: FileChangeListProps) {
   const t = useT();
   const notify = useAppStore((state) => state.notify);
 
-  const handleCopyPath = async (path: string, event: React.MouseEvent) => {
-    event.stopPropagation();
+  const copyPath = async (path: string) => {
     const ok = await copyText(path);
-    notify(ok ? "success" : "error", ok ? t("settings.remotes.copied") : t("diff.copyFailure"));
+    notify(ok ? "success" : "error", ok ? t("diff.copyPathSuccess") : t("diff.copyFailure"));
   };
 
   return (
@@ -34,25 +44,22 @@ export default function FileChangeList({ files, selectedPath, onSelect }: FileCh
         const active = file.path === selectedPath;
         const meta = statusMeta(file.status);
         return (
-          <li key={`${file.oldPath ?? ""}:${file.path}`}>
+          <li
+            key={`${file.oldPath ?? ""}:${file.path}`}
+            className={`group flex items-center pr-1 transition-colors ${
+              active ? "bg-accent-soft" : "hover:bg-ink/4"
+            }`}
+          >
             <button
               type="button"
               onClick={() => onSelect(file)}
               aria-current={active ? "true" : undefined}
-              className={`flex w-full items-center gap-2 px-3 py-[5px] text-left transition-colors ${
-                active ? "bg-accent-soft" : "hover:bg-ink/4"
-              }`}
+              className="flex min-w-0 flex-1 items-center gap-2 px-3 py-[5px] text-left"
             >
-              <span
-                className={`grid h-[15px] w-[15px] shrink-0 place-items-center rounded-[4px] text-[9px] font-bold ${TONE_CLASS[meta.tone]}`}
-                {...tip(meta.label)}
-              >
-                {meta.letter}
-              </span>
+              <FileIcon path={file.path} />
 
               <span
                 className="min-w-0 flex-1 truncate font-mono text-[11px] text-ink-soft"
-                onClick={(e) => void handleCopyPath(file.path, e)}
                 {...tip(file.path)}
               >
                 {file.oldPath ? (
@@ -83,7 +90,23 @@ export default function FileChangeList({ files, selectedPath, onSelect }: FileCh
                   </span>
                 </span>
               )}
+
+              <span
+                className={`grid h-[15px] w-[15px] shrink-0 place-items-center rounded-[4px] text-[9px] font-bold ${TONE_CLASS[meta.tone]}`}
+                {...tip(meta.label)}
+              >
+                {meta.letter}
+              </span>
             </button>
+
+            <IconButton
+              label={t("diff.copyPath")}
+              size="sm"
+              onClick={() => void copyPath(file.path)}
+              className="pointer-events-none ml-0.5 opacity-0 group-hover:pointer-events-auto group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:opacity-100"
+            >
+              <Copy size={11} />
+            </IconButton>
           </li>
         );
       })}

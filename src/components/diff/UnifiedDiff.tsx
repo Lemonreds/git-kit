@@ -1,7 +1,9 @@
 import { Fragment } from "react";
 
 import { useT } from "../../i18n";
+import type { InlineBlameLine } from "../../lib/inlineBlame";
 import type { DiffLine, UnifiedRow } from "../../lib/parsePatch";
+import BlameNote from "./BlameNote";
 import DiffText from "./DiffText";
 
 function tint(line: DiffLine | null): string {
@@ -30,11 +32,14 @@ export default function UnifiedDiff({
   rows,
   limit,
   query = "",
+  blame = null,
 }: {
   rows: UnifiedRow[];
   /** How many rows to render (the rest is hidden until the user scrolls). */
   limit: number;
   query?: string;
+  /** New-side line number → the commit that last touched it. */
+  blame?: Map<number, InlineBlameLine> | null;
 }) {
   const t = useT();
   if (rows.length === 0) {
@@ -64,6 +69,9 @@ export default function UnifiedDiff({
             <span className={`diff-cell px-2 py-0.5 ${tint(line)} ${textTone(line)}`}>
               <span className="mr-1.5 inline-block w-2 select-none opacity-60">{marker(line)}</span>
               <DiffText text={line.text} query={query} />
+              {blame && line.newNumber !== null ? (
+                <BlameNote line={blame.get(line.newNumber)} />
+              ) : null}
             </span>
           </Fragment>
         );

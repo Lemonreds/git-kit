@@ -162,8 +162,8 @@ User opens terminal → terminalSlice.openTerminal()
 
 **Files**:
 - `src/components/conflict/ConflictPanel.tsx` — conflict resolver view (header, batch actions, special states)
-- `src/components/conflict/ConflictBlockCard.tsx` — one conflict block (sides + editable result)
-- `src/components/conflict/ConflictSidePanel.tsx` — read-only side of a block, line `+` picker
+- `src/components/conflict/MergeFileView.tsx` — the whole file as one continuous code stream (context + conflict segments, folding, chunking)
+- `src/components/conflict/ConflictHunk.tsx` — one inline conflict region: code lens (accept current / incoming / both), stacked sides, resolved text and its editor
 - `src/components/history/FileHistoryPanel.tsx` — diff / history / blame tabs of one file
 - `src/components/history/VirtualHistoryList.tsx`, `VirtualBlameList.tsx` — virtualised lists
 - `src/store/slices/conflictSlice.ts`, `src/store/slices/fileHistorySlice.ts` — state + IPC orchestration
@@ -194,6 +194,37 @@ Save → assembleConflictFile(parsed, drafts)
 
 **Caps**: 1.5 MB / 40k lines per side (`complete=false` disables block editing and saving),
 2000-line blame windows, 500 history rows.
+
+### Windows (§3.6)
+
+**Model**: the main window owns the project list; opening a folder **replaces** the
+project it was opened from (one window, one repository). Extra windows are created
+with `?project=<id>` (`open_project_window`) and keep only that repository: the
+project column is hidden, and `bootstrap` never falls back to `last_active`.
+
+```
+ProjectRow → openProjectWindow(id) → commands::open_project_window
+  → WebviewWindow(project-<id>, "index.html?project=<id>", title = repo name)
+  → bootstrap(): activeProject = projects.find(id === ?project)   (no set_active_project)
+```
+
+**Caveats**: PTY sessions live in Rust with a global cap (3); the persisted
+`last_active` pointer is still global, so a window opening a folder rewrites it.
+
+### Inline Blame (§3.7)
+
+**Responsibilities**: show, per line of the diff, which commit last touched it.
+
+```
+DiffViewer → useInlineBlame({path, rev, maxLine})
+  → lib/inlineBlame.ts windows (500 lines, cap 2500, LRU 32)
+  → file_blame(repoPath, path, start, end, rev)   // rev null = working tree
+  → UnifiedDiff/SplitDiff → BlameNote (select-none, tooltip = sha/author/summary)
+```
+
+Cache invalidation rides on `invalidateCaches()` (commit / checkout / refresh).
+Failures are remembered and never retried, so a repo without blame support just
+renders the diff without annotations.
 
 ### File History / Blame (§3.5)
 

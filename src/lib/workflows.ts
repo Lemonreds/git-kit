@@ -27,6 +27,8 @@ export interface WorkflowStep {
   source?: string;
   /** `stash`: include untracked files (default true). */
   includeUntracked?: boolean;
+  /** `commit` / `pull` (merge) / `merge`: pass `-n`, skipping git hooks. */
+  noVerify?: boolean;
 }
 
 export interface Workflow {
@@ -107,6 +109,7 @@ function parseStep(raw: unknown): WorkflowStep | null {
   if (typeof value.includeUntracked === "boolean") {
     step.includeUntracked = value.includeUntracked;
   }
+  if (typeof value.noVerify === "boolean") step.noVerify = value.noVerify;
   return step;
 }
 

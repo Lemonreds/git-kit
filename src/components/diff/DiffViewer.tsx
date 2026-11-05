@@ -2,9 +2,11 @@ import { memo, useEffect, useMemo, useRef, useState } from "react";
 import type { RefObject } from "react";
 import { Binary, FileText, FileWarning } from "lucide-react";
 
+import { useInlineBlame } from "../../hooks/useInlineBlame";
 import { useT } from "../../i18n";
 import { parsePatch, toSplitRowItems, toUnifiedRows } from "../../lib/parsePatch";
 import type { FileDiff } from "../../lib/types";
+import { useAppStore } from "../../store/appStore";
 import type { DiffMode } from "../../store/appStore";
 import EmptyState from "../common/EmptyState";
 import FileContentModal from "./FileContentModal";
@@ -35,6 +37,8 @@ const RENDER_STEP = 600;
 
 function DiffViewer({ diff, mode, query = "", scrollerRef, commitSha }: DiffViewerProps) {
   const t = useT();
+  const inlineBlame = useAppStore((state) => state.inlineBlame);
+  const repoPath = useAppStore((state) => state.activeProject?.path ?? null);
   const parsed = useMemo(() => parsePatch(diff.patch), [diff.patch]);
 
   const totalLines = diff.additions + diff.deletions;
@@ -64,6 +68,31 @@ function DiffViewer({ diff, mode, query = "", scrollerRef, commitSha }: DiffView
   // Matches are found in the DOM, so a search renders the whole file. Closing
   // the search collapses back to the chunked view.
   const visible = searching ? rowCount : Math.min(limit, rowCount);
+
+  // Inline blame follows the new side of the diff (that is the file as it exists
+  // at `commitSha`), and only what is actually rendered — scrolling grows it.
+  const maxNewLine = useMemo(() => {
+    let max = 0;
+    for (const row of unifiedRows?.slice(0, visible) ?? []) {
+      if (row.kind === "line" && row.line.newNumber && row.line.newNumber > max) {
+        max = row.line.newNumber;
+      }
+    }
+    for (const row of splitRows?.slice(0, visible) ?? []) {
+      if (row.kind === "row" && row.right?.newNumber && row.right.newNumber > max) {
+        max = row.right.newNumber;
+      }
+    }
+    return max;
+  }, [unifiedRows, splitRows, visible]);
+
+  const blame = useInlineBlame({
+    enabled: inlineBlame && !diff.isBinary && diff.additions + diff.deletions <= 3000,
+    repoPath,
+    path: diff.path,
+    rev: commitSha ?? null,
+    maxLine: maxNewLine,
+  });
 
   const sentinelRef = useRef<HTMLDivElement | null>(null);
   useEffect(() => {
@@ -143,9 +172,9 @@ function DiffViewer({ diff, mode, query = "", scrollerRef, commitSha }: DiffView
       ) : null}
 
       {unifiedRows ? (
-        <UnifiedDiff rows={unifiedRows} limit={visible} query={query} />
+        <UnifiedDiff rows={unifiedRows} limit={visible} query={query} blame={blame} />
       ) : splitRows ? (
-        <SplitDiff rows={splitRows} limit={visible} query={query} />
+        <SplitDiff rows={splitRows} limit={visible} query={query} blame={blame} />
       ) : null}
 
       {visible < rowCount ? (

@@ -11,7 +11,7 @@ use crate::model::{
     StashEntry, StashList, TagInfo,
 };
 
-use super::cli::{NETWORK_TIMEOUT, run, run_blocking};
+use super::cli::{NETWORK_TIMEOUT, run, run_blocking, with_hook_bypass};
 use super::diff;
 use super::ops::{commits_in_range, conflict_paths, resolve_remote, split_remote_ref};
 use super::repo::{head_branch, is_dirty, open_repo, resolve_rev, short_id};
@@ -132,7 +132,11 @@ fn operation_error(kind: &str, detail: &str, conflicts: &[String]) -> AppError {
 }
 
 /// `continue` / `skip` / `abort` for whatever operation is in progress.
-pub fn operation_action(repo_path: &Path, action: &str) -> Result<RepoOperationState, AppError> {
+pub fn operation_action(
+    repo_path: &Path,
+    action: &str,
+    no_verify: bool,
+) -> Result<RepoOperationState, AppError> {
     let repo = open(repo_path)?;
     let state = repo_state(&repo);
     if state.kind == "none" {
@@ -160,11 +164,15 @@ pub fn operation_action(repo_path: &Path, action: &str) -> Result<RepoOperationS
     }
 
     // A merge is concluded with a plain commit; the other operations have their
-    // own `--continue` implementations.
+    // own `--continue` implementations, none of which accept `--no-verify`.
     let result = if kind == "merge" && action == "continue" {
-        run_blocking(repo_path, &["commit", "--no-edit", "--no-gpg-sign"])
-    } else {
+        let mut args: Vec<&str> = vec!["commit", "--no-edit", "--no-gpg-sign"];
+        if no_verify {
+            args.push("--no-verify");
+        }
         run_blocking(repo_path, &args)
+    } else {
+        run_blocking(repo_path, &with_hook_bypass(args, no_verify))
     };
 
     let repo = open(repo_path)?;
@@ -320,7 +328,7 @@ pub fn head_commit_preview(repo: &Repository) -> Result<HeadCommitPreview, AppEr
 
 /// `git commit --amend`: replaces HEAD with a new commit (staged changes are
 /// included, the tree is otherwise unchanged).
-pub fn amend_commit(repo_path: &Path, message: &str) -> Result<CommitResult, AppError> {
+pub fn amend_commit(repo_path: &Path, message: &str, no_verify: bool) -> Result<CommitResult, AppError> {
     let message = message.trim();
     if message.is_empty() {
         return Err(AppError::message("提交信息不能为空"));
@@ -346,11 +354,13 @@ pub fn amend_commit(repo_path: &Path, message: &str) -> Result<CommitResult, App
         }
     };
 
-    run_blocking(
-        repo_path,
-        &["commit", "--amend", "--no-gpg-sign", "-m", message],
-    )
-    .map_err(|error| {
+    let mut args: Vec<&str> = vec!["commit", "--amend", "--no-gpg-sign"];
+    if no_verify {
+        args.push("--no-verify");
+    }
+    args.extend(["-m", message]);
+
+    run_blocking(repo_path, &args).map_err(|error| {
         let detail = command_detail(&error);
         if detail.to_ascii_lowercase().contains("unmerged") {
             return AppError::message(format!("还有未解决的冲突，无法修正提交：\n{detail}"));
@@ -437,7 +447,12 @@ pub fn merge_preview(repo: &Repository, source: &str) -> Result<MergePreview, Ap
     })
 }
 
-pub fn merge_branch(repo_path: &Path, source: &str, no_ff: bool) -> Result<MergeResult, AppError> {
+pub fn merge_branch(
+    repo_path: &Path,
+    source: &str,
+    no_ff: bool,
+    no_verify: bool,
+) -> Result<MergeResult, AppError> {
     if source.starts_with('-') {
         return Err(AppError::message(format!("非法的分支名：{source}")));
     }
@@ -465,6 +480,11 @@ pub fn merge_branch(repo_path: &Path, source: &str, no_ff: bool) -> Result<Merge
     let mut args: Vec<&str> = vec!["merge", "--no-gpg-sign", "--no-edit"];
     if no_ff {
         args.push("--no-ff");
+    }
+    if no_verify {
+        // Bypasses the `pre-merge-commit` and `commit-msg` hooks of the merge
+        // commit; a fast-forward runs none either way.
+        args.push("--no-verify");
     }
     args.push(source);
 
@@ -512,7 +532,7 @@ pub fn merge_branch(repo_path: &Path, source: &str, no_ff: bool) -> Result<Merge
 
 // --- revert ----------------------------------------------------------------
 
-pub fn revert_commit(repo_path: &Path, sha: &str) -> Result<CommitResult, AppError> {
+pub fn revert_commit(repo_path: &Path, sha: &str, no_verify: bool) -> Result<CommitResult, AppError> {
     if sha.starts_with('-') {
         return Err(AppError::message(format!("非法的提交：{sha}")));
     }
@@ -522,11 +542,14 @@ pub fn revert_commit(repo_path: &Path, sha: &str) -> Result<CommitResult, AppErr
         .find_commit(oid)
         .map_err(|_| AppError::CommitNotFound(sha.to_string()))?;
 
-    run_blocking(
-        repo_path,
-        &["revert", "--no-edit", "--no-gpg-sign", oid.to_string().as_str()],
-    )
-    .map_err(|error| {
+    // `git revert` has no `--no-verify`, so the hooks are skipped through
+    // `core.hooksPath` instead.
+    let oid_text = oid.to_string();
+    let args = with_hook_bypass(
+        vec!["revert", "--no-edit", "--no-gpg-sign", oid_text.as_str()],
+        no_verify,
+    );
+    run_blocking(repo_path, &args).map_err(|error| {
         let conflicts = conflict_paths(repo_path);
         if conflicts.is_empty() {
             return AppError::CommandFailed(format!(

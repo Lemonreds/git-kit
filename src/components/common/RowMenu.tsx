@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
-import { Ellipsis } from "lucide-react";
+import { Check, Ellipsis } from "lucide-react";
 import { createPortal } from "react-dom";
 
 import { tip } from "./Tooltip";
@@ -11,6 +11,8 @@ export interface RowMenuItem {
   onSelect: () => void;
   tone?: "default" | "danger";
   separatorBefore?: boolean;
+  /** Renders a check at the right edge (toggle items). */
+  checked?: boolean;
 }
 
 interface RowMenuProps {
@@ -123,6 +125,9 @@ export default function RowMenu({ label, items }: RowMenuProps) {
                         {item.icon}
                       </span>
                       <span className="min-w-0 flex-1 whitespace-nowrap">{item.label}</span>
+                      {item.checked ? (
+                        <Check size={11} className="shrink-0 text-accent" />
+                      ) : null}
                     </button>
                   </div>
                 ))}

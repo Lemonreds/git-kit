@@ -60,6 +60,8 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             commands::list_projects,
             commands::add_project,
+            commands::open_project_window,
+            commands::clone_repo,
             commands::relink_project,
             commands::remove_project,
             commands::set_active_project,

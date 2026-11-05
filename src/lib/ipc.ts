@@ -102,6 +102,11 @@ export interface TerminalStream {
 export const api = {
   listProjects: () => call<ProjectList>("list_projects"),
   addProject: (path: string) => call<Project>("add_project", { path }),
+  openProjectWindow: (projectId: string, name: string) =>
+    call<void>("open_project_window", { projectId, name }),
+  /** `git clone <url> <parentDir>/<name>`; returns the registered project. */
+  cloneRepo: (parentDir: string, url: string, name: string | null) =>
+    call<Project>("clone_repo", { parentDir, url, name }),
   relinkProject: (id: string, path: string) => call<Project>("relink_project", { id, path }),
   removeProject: (id: string) => call<void>("remove_project", { id }),
   setActiveProject: (id: string | null) => call<void>("set_active_project", { id }),
@@ -154,10 +159,27 @@ export const api = {
 
   squashPreview: (repoPath: string, branch: string) =>
     call<SquashPreview>("squash_preview", { repoPath, branch }),
-  squashCommits: (repoPath: string, branch: string, count: number, message: string) =>
-    call<SquashResult>("squash_commits", { repoPath, branch, count, message }),
-  cherryPick: (repoPath: string, sourceBranch: string, targetBranch: string, shas: string[]) =>
-    call<CherryPickResult>("cherry_pick", { repoPath, sourceBranch, targetBranch, shas }),
+  squashCommits: (
+    repoPath: string,
+    branch: string,
+    count: number,
+    message: string,
+    noVerify = false,
+  ) => call<SquashResult>("squash_commits", { repoPath, branch, count, message, noVerify }),
+  cherryPick: (
+    repoPath: string,
+    sourceBranch: string,
+    targetBranch: string,
+    shas: string[],
+    noVerify = false,
+  ) =>
+    call<CherryPickResult>("cherry_pick", {
+      repoPath,
+      sourceBranch,
+      targetBranch,
+      shas,
+      noVerify,
+    }),
   createBranch: (repoPath: string, name: string, baseRef: string, checkout = true) =>
     call<CreateBranchResult>("create_branch", { repoPath, name, baseRef, checkout }),
   checkoutBranch: (repoPath: string, branch: string) =>
@@ -173,8 +195,13 @@ export const api = {
     call<PushPreview>("push_preview", { repoPath, branch }),
   pullPreview: (repoPath: string, branch: string) =>
     call<PullPreview>("pull_preview", { repoPath, branch }),
-  pullBranch: (repoPath: string, branch: string, allowMerge: boolean, switchFirst = false) =>
-    call<PullResult>("pull_branch", { repoPath, branch, allowMerge, switchFirst }),
+  pullBranch: (
+    repoPath: string,
+    branch: string,
+    allowMerge: boolean,
+    switchFirst = false,
+    noVerify = false,
+  ) => call<PullResult>("pull_branch", { repoPath, branch, allowMerge, switchFirst, noVerify }),
   rebasePreview: (repoPath: string, branch: string, baseRef: string) =>
     call<RebasePreview>("rebase_preview", { repoPath, branch, baseRef }),
   rebaseBranch: (repoPath: string, branch: string, baseRef: string) =>
@@ -201,8 +228,8 @@ export const api = {
 
   // --- P0 / P1 / P2 workflow ---
   getRepoState: (repoPath: string) => call<RepoOperationState>("get_repo_state", { repoPath }),
-  repoOperation: (repoPath: string, action: "continue" | "skip" | "abort") =>
-    call<RepoOperationState>("repo_operation_action", { repoPath, action }),
+  repoOperation: (repoPath: string, action: "continue" | "skip" | "abort", noVerify = false) =>
+    call<RepoOperationState>("repo_operation_action", { repoPath, action, noVerify }),
 
   // --- conflict resolution ---
   listConflicts: (repoPath: string) => call<ConflictFile[]>("list_conflicts", { repoPath }),
@@ -240,17 +267,17 @@ export const api = {
 
   headCommitPreview: (repoPath: string) =>
     call<HeadCommitPreview>("head_commit_preview", { repoPath }),
-  amendCommit: (repoPath: string, message: string) =>
-    call<CommitResult>("amend_commit", { repoPath, message }),
+  amendCommit: (repoPath: string, message: string, noVerify = false) =>
+    call<CommitResult>("amend_commit", { repoPath, message, noVerify }),
   ignorePath: (repoPath: string, path: string, isDir = false) =>
     call<void>("ignore_path", { repoPath, path, isDir }),
 
   mergePreview: (repoPath: string, source: string) =>
     call<MergePreview>("merge_preview", { repoPath, source }),
-  mergeBranch: (repoPath: string, source: string, noFf = false) =>
-    call<MergeResult>("merge_branch", { repoPath, source, noFf }),
-  revertCommit: (repoPath: string, sha: string) =>
-    call<CommitResult>("revert_commit", { repoPath, sha }),
+  mergeBranch: (repoPath: string, source: string, noFf = false, noVerify = false) =>
+    call<MergeResult>("merge_branch", { repoPath, source, noFf, noVerify }),
+  revertCommit: (repoPath: string, sha: string, noVerify = false) =>
+    call<CommitResult>("revert_commit", { repoPath, sha, noVerify }),
 
   listTags: (repoPath: string) => call<TagInfo[]>("list_tags", { repoPath }),
   createTag: (repoPath: string, name: string, target: string, message = "") =>

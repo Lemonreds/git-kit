@@ -94,6 +94,33 @@ interface Attachment {
 const attachments = new Map<string, Attachment>();
 
 /**
+ * A layout splitter is being dragged.
+ *
+ * Fitting every frame reflows the xterm grid dozens of times per second: rows get
+ * repainted while the container is still moving, which is exactly when lines end
+ * up drawn on top of each other. Instead the fits are collected and replayed once
+ * when the drag ends — the buffer keeps its old grid (clipped by `overflow-hidden`
+ * on the host) for the duration of the drag.
+ */
+let layoutResizing = false;
+const deferredFits = new Set<string>();
+
+export function beginTerminalResize(): void {
+  layoutResizing = true;
+  // A drag that ends outside the window never fires `pointerup`; without this
+  // safety net the guard would stay on and the terminal would never re-fit.
+  window.addEventListener("blur", endTerminalResize, { once: true });
+}
+
+export function endTerminalResize(): void {
+  if (!layoutResizing) return;
+  layoutResizing = false;
+  const keys = [...deferredFits];
+  deferredFits.clear();
+  for (const key of keys) fitTerminal(key);
+}
+
+/**
  * The terminal is deliberately theme-independent: the app theme no longer touches
  * it (a dark palette inside a light shell, or the reverse, has bitten us more
  * than once). One literal light palette, always.
@@ -330,6 +357,10 @@ function syncPause(attachment: Attachment): void {
 export function fitTerminal(key: string): void {
   const attachment = attachments.get(key);
   if (!attachment?.term || !attachment.fit) return;
+  if (layoutResizing) {
+    deferredFits.add(key);
+    return;
+  }
   if (attachment.fitFrame) cancelAnimationFrame(attachment.fitFrame);
   attachment.fitFrame = requestAnimationFrame(() => {
     attachment.fitFrame = 0;
@@ -389,6 +420,28 @@ export function writeTerminal(key: string, data: string): void {
   const attachment = attachments.get(key);
   if (!attachment?.rustId) return;
   void api.terminalWrite(attachment.rustId, data).catch(() => undefined);
+}
+
+/**
+ * Kill the shell behind a session but keep its xterm (and scroll buffer) alive.
+ *
+ * The difference from `disposeTerminal`: closing a tab throws the buffer away,
+ * while shutting down only ends the process — the tab flips to "exited" through
+ * the normal exit frame and `+` can open a fresh shell for the same project.
+ * `terminal_close` already kills the child and drops the pty master, which also
+ * hangs up whatever foreground process was running in it.
+ *
+ * Returns false when there is no live pty (already exited or still opening).
+ */
+export function shutdownTerminal(key: string): boolean {
+  const attachment = attachments.get(key);
+  const rustId = attachment?.rustId;
+  if (!attachment || !rustId) return false;
+  // Cleared first: writes and pause/resume must not chase a pty that is going
+  // away, and the frame from Rust lands a moment later anyway.
+  attachment.rustId = null;
+  void api.terminalClose(rustId).catch(() => undefined);
+  return true;
 }
 
 /**

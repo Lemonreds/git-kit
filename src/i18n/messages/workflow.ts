@@ -36,6 +36,7 @@ export const zh = {
   "workflow.rebaseSourcePlaceholder": "留空则使用当前分支的上游",
   "workflow.pullMerge": "使用 merge（默认 rebase）",
   "workflow.includeUntracked": "包含未跟踪文件",
+  "workflow.skipHooks": "跳过钩子（-n）",
   "workflow.stepNeedsMessage": "请先填写提交说明",
   "workflow.stepNeedsSource": "请先填写来源分支",
 
@@ -116,6 +117,7 @@ export const en: Record<keyof typeof zh, Message> = {
   "workflow.rebaseSourcePlaceholder": "Empty = upstream of the current branch",
   "workflow.pullMerge": "Merge instead of rebase",
   "workflow.includeUntracked": "Include untracked files",
+  "workflow.skipHooks": "Skip hooks (-n)",
   "workflow.stepNeedsMessage": "Add a commit message first",
   "workflow.stepNeedsSource": "Add a source branch first",
 

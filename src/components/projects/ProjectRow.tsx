@@ -1,5 +1,6 @@
 import {
   AlertTriangle,
+  AppWindow,
   FolderGit2,
   FolderSearch,
   Loader2,
@@ -26,6 +27,7 @@ interface ProjectRowProps {
   onRelink: () => void;
   onTogglePin: () => void;
   onOpenTerminal: () => void;
+  onOpenWindow: () => void;
 }
 
 export default function ProjectRow({
@@ -38,6 +40,7 @@ export default function ProjectRow({
   onRelink,
   onTogglePin,
   onOpenTerminal,
+  onOpenWindow,
 }: ProjectRowProps) {
   const t = useT();
   const unavailable = project.status !== "ok";
@@ -135,6 +138,9 @@ export default function ProjectRow({
             <SquareTerminal size={13} />
           </IconButton>
         )}
+        <IconButton label={t("projects.openInNewWindow")} size="sm" onClick={onOpenWindow}>
+          <AppWindow size={13} />
+        </IconButton>
         <IconButton
           label={pinned ? t("projects.unpin") : t("projects.pin")}
           size="sm"

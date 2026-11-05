@@ -6,6 +6,7 @@ import { api } from "../../lib/ipc";
 import { statusMeta } from "../../lib/format";
 import type { HeadCommitPreview, WorktreeEntry } from "../../lib/types";
 import { useAppStore } from "../../store/appStore";
+import FileIcon from "../common/FileIcon";
 import HelpTip from "../common/HelpTip";
 import Modal from "../common/Modal";
 
@@ -70,7 +71,7 @@ export default function CommitDialog({
     if (!valid || busy) return;
     setBusy(true);
     if (amend) {
-      const outcome = await amendCommit(trimmed);
+      const outcome = await amendCommit(trimmed, skipHooks);
       setBusy(false);
       if (!outcome.ok) return;
       if (outcome.needsForcePush) {
@@ -155,29 +156,29 @@ export default function CommitDialog({
           </span>
         </div>
 
-        {amend ? null : (
-          <div className="flex items-center justify-between rounded-lg border border-line bg-canvas/40 px-2.5 py-1.5">
-            <button
-              type="button"
-              onClick={() => setSkipHooks((value) => !value)}
-              disabled={busy}
-              className="flex items-center gap-2 text-left"
+        <div className="flex items-center justify-between rounded-lg border border-line bg-canvas/40 px-2.5 py-1.5">
+          <button
+            type="button"
+            onClick={() => setSkipHooks((value) => !value)}
+            disabled={busy}
+            className="flex items-center gap-2 text-left"
+          >
+            <span
+              className={`grid h-3.5 w-3.5 shrink-0 place-items-center rounded-[4px] border transition-colors ${
+                skipHooks ? "border-accent bg-accent text-white" : "border-line-strong bg-panel"
+              }`}
             >
-              <span
-                className={`grid h-3.5 w-3.5 shrink-0 place-items-center rounded-[4px] border transition-colors ${
-                  skipHooks ? "border-accent bg-accent text-white" : "border-line-strong bg-panel"
-                }`}
-              >
-                {skipHooks ? <Check size={9} strokeWidth={3} /> : null}
-              </span>
-              <span className="text-[11.5px] text-ink">{t("changes.skipHooksToggle")}</span>
-            </button>
-            <span className="flex shrink-0 items-center gap-1.5 text-[10px] text-ink-faint">
-              <span className="font-mono">{skipHooks ? "git commit -n" : ""}</span>
-              <HelpTip label={t("changes.skipHooksHelp")} />
+              {skipHooks ? <Check size={9} strokeWidth={3} /> : null}
             </span>
-          </div>
-        )}
+            <span className="text-[11.5px] text-ink">{t("changes.skipHooksToggle")}</span>
+          </button>
+          <span className="flex shrink-0 items-center gap-1.5 text-[10px] text-ink-faint">
+            <span className="font-mono">
+              {skipHooks ? (amend ? "git commit --amend -n" : "git commit -n") : ""}
+            </span>
+            <HelpTip label={t("changes.skipHooksHelp")} />
+          </span>
+        </div>
 
         {amendError ? (
           <p className="whitespace-pre-line rounded-lg border border-negative/30 bg-negative/8 px-3 py-2 font-mono text-[10px] text-negative">
@@ -213,11 +214,7 @@ export default function CommitDialog({
                   key={entry.path}
                   className="flex items-center gap-2 border-b border-line/60 px-2.5 py-1 last:border-b-0"
                 >
-                  <span
-                    className={`grid h-[15px] w-[15px] shrink-0 place-items-center rounded-[4px] text-[9px] font-bold ${TONE_CLASS[meta.tone]}`}
-                  >
-                    {meta.letter}
-                  </span>
+                  <FileIcon path={entry.path} size={13} />
                   <span className="min-w-0 flex-1 truncate font-mono text-[11.5px] text-ink-soft">
                     {entry.oldPath ? (
                       <>
@@ -232,6 +229,11 @@ export default function CommitDialog({
                     )}
                   </span>
                   <span className="shrink-0 text-[9.5px] text-ink-faint">{meta.label}</span>
+                  <span
+                    className={`grid h-[15px] w-[15px] shrink-0 place-items-center rounded-[4px] text-[9px] font-bold ${TONE_CLASS[meta.tone]}`}
+                  >
+                    {meta.letter}
+                  </span>
                 </div>
               );
             })}

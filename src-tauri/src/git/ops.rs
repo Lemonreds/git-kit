@@ -11,6 +11,7 @@ use crate::model::{
 
 use super::cli::{
     NETWORK_TIMEOUT, ensure_branch_checked_out, ensure_clean_worktree, run, run_blocking,
+    with_hook_bypass,
 };
 use super::repo::{open_repo, remote_names, resolve_rev, short_id, summarize};
 
@@ -240,6 +241,7 @@ pub fn squash_commits(
     branch: &str,
     count: usize,
     message: &str,
+    no_verify: bool,
 ) -> Result<SquashResult, AppError> {
     let message = message.trim();
     if count == 0 {
@@ -276,8 +278,15 @@ pub fn squash_commits(
     })?;
 
     // GPG signing is disabled here: a signing prompt would silently block the
-    // app. Hooks still run, and a failure leaves the squash in the index.
-    if let Err(error) = run_blocking(repo_path, &["commit", "--no-gpg-sign", "-m", message]) {
+    // app. Hooks run unless the user opted out with `-n` (a hook that hangs
+    // would otherwise leave the squash half-applied), and a failure leaves the
+    // squash in the index.
+    let mut commit_args: Vec<&str> = vec!["commit", "--no-gpg-sign"];
+    if no_verify {
+        commit_args.push("--no-verify");
+    }
+    commit_args.extend(["-m", message]);
+    if let Err(error) = run_blocking(repo_path, &commit_args) {
         return Err(AppError::CommandFailed(format!(
             "已执行 reset --soft {range}，但提交失败：{}\n改动仍保留在暂存区，可手动执行 git commit 完成压缩",
             command_detail(&error)
@@ -310,6 +319,7 @@ pub fn cherry_pick(
     source_branch: &str,
     target_branch: &str,
     shas: &[String],
+    no_verify: bool,
 ) -> Result<CherryPickResult, AppError> {
     if shas.is_empty() {
         return Err(AppError::message("请至少选择一个提交"));
@@ -342,6 +352,9 @@ pub fn cherry_pick(
     let mut args: Vec<String> = vec!["cherry-pick".to_string()];
     args.extend(ordered.iter().map(|(_, sha)| sha.clone()));
     let arg_refs: Vec<&str> = args.iter().map(String::as_str).collect();
+    // `cherry-pick` has no `--no-verify`: hook skipping goes through
+    // `core.hooksPath`, which also covers the commits it creates.
+    let arg_refs = with_hook_bypass(arg_refs, no_verify);
 
     match run_blocking(repo_path, &arg_refs) {
         Ok(_) => Ok(CherryPickResult {
@@ -855,6 +868,7 @@ pub fn pull_branch(
     branch: &str,
     allow_merge: bool,
     switch_first: bool,
+    no_verify: bool,
 ) -> Result<PullResult, AppError> {
     if branch.starts_with('-') {
         return Err(AppError::message(format!("非法的分支名：{branch}")));
@@ -944,6 +958,11 @@ pub fn pull_branch(
 
     let strategy = if ahead == 0 { "fast-forward" } else { "merge" };
     let mut args: Vec<&str> = vec!["merge", "--no-gpg-sign", "--no-edit"];
+    if no_verify {
+        // A fast-forward runs no hooks, and the merge commit of a diverged pull
+        // is exactly what `-n` should be able to skip.
+        args.push("--no-verify");
+    }
     if ahead == 0 {
         args.push("--ff-only");
     }

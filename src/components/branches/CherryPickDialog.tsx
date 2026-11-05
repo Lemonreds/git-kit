@@ -27,6 +27,7 @@ export default function CherryPickDialog({ branch, onClose }: CherryPickDialogPr
   const [target, setTarget] = useState("");
   const [query, setQuery] = useState("");
   const [busy, setBusy] = useState(false);
+  const [skipHooks, setSkipHooks] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const targets = useMemo(
@@ -86,7 +87,7 @@ export default function CherryPickDialog({ branch, onClose }: CherryPickDialogPr
   const submit = async () => {
     if (busy || !target || selected.length === 0) return;
     setBusy(true);
-    const ok = await cherryPick(branch.name, target, selected);
+    const ok = await cherryPick(branch.name, target, selected, skipHooks);
     setBusy(false);
     if (ok) onClose();
   };
@@ -227,6 +228,28 @@ export default function CherryPickDialog({ branch, onClose }: CherryPickDialogPr
             )}
           </div>
         </div>
+
+        <label className="flex cursor-pointer items-start gap-2 rounded-lg border border-line bg-canvas/40 px-3 py-2">
+          <span
+            className={`mt-0.5 grid h-3.5 w-3.5 shrink-0 place-items-center rounded-[4px] border transition-colors ${
+              skipHooks ? "border-accent bg-accent text-white" : "border-line-strong bg-panel"
+            }`}
+          >
+            {skipHooks ? <Check size={9} strokeWidth={3} /> : null}
+          </span>
+          <input
+            type="checkbox"
+            checked={skipHooks}
+            onChange={() => setSkipHooks((value) => !value)}
+            className="sr-only"
+          />
+          <span className="min-w-0 flex-1 text-[11px] leading-relaxed text-ink-soft">
+            {t("branches.skipHooksLabel")}
+            <span className="mt-0.5 block text-[10px] text-ink-faint">
+              {t("branches.skipHooksHint")}
+            </span>
+          </span>
+        </label>
       </div>
     </Modal>
   );

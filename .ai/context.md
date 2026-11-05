@@ -19,14 +19,19 @@
 | **Commit UI** | `src/components/commits/CommitPanel.tsx` |
 | **Commit state** | `src/store/slices/commitsSlice.ts` |
 | **Changes UI** | `src/components/changes/ChangesPanel.tsx` |
-| **Conflict resolver UI** | `src/components/conflict/ConflictPanel.tsx`, `ConflictBlockCard.tsx` |
+| **Conflict resolver UI** | `src/components/conflict/ConflictPanel.tsx`, `MergeFileView.tsx` (whole file), `ConflictHunk.tsx` (one region) |
 | **Conflict resolver state** | `src/store/slices/conflictSlice.ts` |
 | **Conflict markers** | `src/lib/parseConflicts.ts` (parse / assemble, pure) |
 | **Conflict backend** | `src-tauri/src/git/conflict.rs` (stages read, atomic write + stage) |
 | **File history / blame UI** | `src/components/history/FileHistoryPanel.tsx`, `VirtualBlameList.tsx` |
 | **File history state** | `src/store/slices/fileHistorySlice.ts` (windows + LRU caches) |
 | **Blame / history backend** | `src-tauri/src/git/history.rs` (git CLI windows) |
-| **Diff UI** | `src/components/diff/DiffPanel.tsx` (view priority: conflict → history → worktree → commit) |
+| **Diff UI** | `src/components/diff/DiffPanel.tsx` (view priority: conflict → history → worktree → commit; file list ↔ diff splitter) |
+| **Inline blame** | `src/hooks/useInlineBlame.ts`, `src/lib/inlineBlame.ts` (window cache), `src/components/diff/BlameNote.tsx` |
+| **Branch switcher** | `src/components/workspace/BranchPicker.tsx` (status bar quick pick), `src/components/common/AnchoredPanel.tsx` (popover) |
+| **Window target** | `src/lib/windowTarget.ts` reads `?project=<id>`; `open_project_window` command makes one window per repository |
+| **File icons** | `src/lib/fileIcons.ts` (extension → glyph + colour), `src/components/common/FileIcon.tsx` |
+| **Splitter** | `src/components/common/Splitter.tsx` (window columns, terminal drawer, diff file list) |
 | **Terminal UI** | `src/components/terminal/Terminal.tsx` |
 | **Terminal state** | `src/store/slices/terminalSlice.ts` (LRU, max 3 sessions) |
 | **Terminal backend** | `src-tauri/src/terminal.rs` (PTY management) |

@@ -3,6 +3,10 @@ import type { Message } from "../types";
 export const zh = {
   "diff.copyShaSuccess": "已复制完整提交 SHA",
   "diff.copyPatchSuccess": "已复制该文件的改动",
+  "diff.inlineBlame": "行内显示最近改动",
+  "diff.blameUncommitted": "未提交",
+  "diff.copyPath": "复制文件路径",
+  "diff.copyPathSuccess": "已复制文件路径",
   "diff.copyFailure": "复制失败",
   "diff.unifiedView": "统一视图",
   "diff.splitView": "分栏视图",
@@ -41,6 +45,9 @@ export const zh = {
     "会生成一个反向提交（git revert），不会改写历史，适合已推送的提交。",
   "diff.revertConfirm": "撤销提交",
   "diff.revertFailed": "撤销提交失败",
+  "diff.revertSkipHooks": "跳过提交前置检查（-n）",
+  "diff.revertSkipHooksHint":
+    "加 --no-verify，跳过 pre-commit / commit-msg 钩子。默认不跳过。",
   "diff.binaryTitle": "二进制文件",
   "diff.binaryDescription": "该文件无法按行展示差异，请在本地工具中查看。",
   "diff.binaryBadge": "二进制",
@@ -60,6 +67,10 @@ export const zh = {
 export const en: Record<keyof typeof zh, Message> = {
   "diff.copyShaSuccess": "Copied the full commit SHA",
   "diff.copyPatchSuccess": "Copied this file's changes",
+  "diff.inlineBlame": "Show inline blame",
+  "diff.blameUncommitted": "Uncommitted",
+  "diff.copyPath": "Copy file path",
+  "diff.copyPathSuccess": "Copied the file path",
   "diff.copyFailure": "Copy failed",
   "diff.unifiedView": "Unified view",
   "diff.splitView": "Split view",
@@ -100,6 +111,9 @@ export const en: Record<keyof typeof zh, Message> = {
     "This creates a reverse commit (git revert) without rewriting history, which is safe for commits that were already pushed.",
   "diff.revertConfirm": "Revert commit",
   "diff.revertFailed": "Revert failed",
+  "diff.revertSkipHooks": "Skip commit hooks (-n)",
+  "diff.revertSkipHooksHint":
+    "Adds --no-verify, skipping the pre-commit / commit-msg hooks. Off by default.",
   "diff.binaryTitle": "Binary file",
   "diff.binaryDescription":
     "This file cannot be shown as a line diff. Open it in a local tool instead.",
